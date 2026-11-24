@@ -20,17 +20,7 @@ e1, e2 = st.columns([1, 1], vertical_alignment="bottom")
 semana = ui.elegir_semana(key="excel_semana", donde=e1)
 
 
-quien = st.session_state["usuario"]["usuario"]   # la función de descarga corre por fuera de la sesión
-
-
-def excel() -> bytes:
-    """Se genera al pulsar el botón (no en cada recarga de la pantalla)."""
-    return api.archivo(f"/reportes/consolidado-semanal/{semana}", quien)
-
-
-e2.download_button("Descargar Excel", data=excel, file_name=f"Agritics_consolidado_{semana}.xlsx",
-                   mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                   type="primary", icon=":material/download:")
+ui.boton_excel(semana, donde=e2)
 st.caption("Ingresos vs. egresos por semana del año hasta la semana elegida, con el detalle diario y la nómina de esa semana.")
 
 # ── auditoría ──

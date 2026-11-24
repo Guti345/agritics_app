@@ -21,31 +21,41 @@ CAMPO = [
     ("pages/pool.py", "Pool de trabajadores", ":material/groups:"),
     ("pages/cronograma.py", "Cronograma de la finca", ":material/view_week:"),
 ]
+REPORTES = [
+    ("pages/r1_produccion.py", "Producción (R1)", ":material/coffee:"),
+    ("pages/r2_flujo.py", "Flujo de caja (R2)", ":material/account_balance_wallet:"),
+    ("pages/r3_nomina.py", "Nómina y labores (R3)", ":material/badge:"),
+]
 PANTALLAS = {
-    "mayordomo": CAMPO,
+    "mayordomo": CAMPO,                        # sin reportes
     "administrador": {
         "La semana": [
             ("pages/tablero_semana.py", "Tablero de la semana", ":material/calendar_view_week:"),
-            ("pages/nomina.py", "Nómina de la semana", ":material/badge:"),
             ("pages/cortes.py", "Cortes de nómina", ":material/content_cut:"),
         ],
         "Libro contable": [
             ("pages/libro.py", "Ventas, compras y gastos", ":material/receipt_long:"),
-            ("pages/caja.py", "Caja", ":material/account_balance_wallet:"),
+            ("pages/caja.py", "Caja", ":material/wallet:"),
         ],
         # El administrador también puede escribir lo de campo (la API lo deja: ADMIN_O_MAYORDOMO).
         "Campo": CAMPO,
+        "Reportes": [
+            *REPORTES,
+            ("pages/tablero_kpis.py", "Resultados de la junta", ":material/monitoring:"),
+        ],
         "Administración": [
             ("pages/catalogos.py", "Catálogos", ":material/list_alt:"),
             ("pages/trazabilidad.py", "Trazabilidad y Excel", ":material/history:"),
-            ("pages/reportes.py", "Reportes", ":material/bar_chart:"),   # R1-R3 con gráficos: F4
         ],
     },
+    # Junta: todo solo lectura (estas pantallas no tienen formularios).
     "junta": [
-        ("pages/tablero_kpis.py", "Tablero de KPIs", ":material/monitoring:"),
+        ("pages/tablero_kpis.py", "Resultados del periodo", ":material/monitoring:"),
+        *REPORTES,
     ],
     "superusuario": [
         ("pages/usuarios.py", "Usuarios", ":material/group:"),
+        ("pages/auditoria.py", "Auditoría", ":material/history:"),
     ],
 }
 
@@ -111,7 +121,7 @@ if usuario["rol"] not in PANTALLAS:
     st.error(f"El rol «{usuario['rol']}» no tiene pantallas asignadas. Inicia sesión de nuevo.")
     st.stop()
 
-pagina = st.navigation(paginas(PANTALLAS[usuario["rol"]]), position="sidebar")
+pagina = st.navigation(paginas(PANTALLAS[usuario["rol"]]), position="sidebar", expanded=True)  # sin «ver más»
 
 with st.sidebar:
     st.button("Cerrar sesión", icon=":material/logout:", on_click=cerrar_sesion, width="stretch")

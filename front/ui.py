@@ -40,7 +40,6 @@ CSS = """
 .ag-semana span {background: #EBE2DD; border-radius: 8px; padding: .35rem .8rem; white-space: nowrap;}
 .ag-usuario {line-height: 1.3;}
 .ag-usuario small {font-size: 14px; opacity: .85;}
-.ag-nota {background: #EBE2DD; border-radius: 8px; padding: .8rem 1rem; font-weight: 600;}
 /* calendario y cronograma: planeadas (borde punteado) vs. reales (abierta: borde vivo; completada: sólida) */
 .ag-scroll {overflow-x: auto;}
 table.ag-cal {border-collapse: separate; border-spacing: 0; width: 100%; background: #FFFFFF;
@@ -118,6 +117,12 @@ def elegir_semana(rotulo: str = "Semana", key: str = "semana", donde=None,
 def a_fecha(valor) -> date:
     """'2026-11-24' (o date) -> date."""
     return valor if isinstance(valor, date) else date.fromisoformat(str(valor)[:10])
+
+
+def dia_bogota(valor: str) -> date:
+    """'2026-11-25T03:15:00Z' -> date(2026, 11, 24): el día en hora de Colombia."""
+    momento = datetime.fromisoformat(str(valor).replace("Z", "+00:00"))
+    return (momento.astimezone(BOGOTA) if momento.tzinfo else momento).date()
 
 
 def fecha_hora(valor: str) -> str:
@@ -220,12 +225,6 @@ LEYENDA = ("<div class='ag-leyenda'>"
            "<span class='ag-chip real completada'>Real completada</span></div>")
 
 
-def en_construccion(titulo: str, para_que: str) -> None:
-    st.title(titulo)
-    st.write(para_que)
-    st.html("<div class='ag-nota'>Pantalla en construcción.</div>")
-
-
 # ── envío de formularios ───────────────────────────────────────────────────────
 
 _AVISO = "_aviso_guardado"
@@ -311,6 +310,16 @@ def foto_nueva(clave: str) -> None:
     """Tras guardar: el uploader vuelve a quedar vacío para el siguiente registro."""
     st.session_state[f"{clave}_n"] = st.session_state.get(f"{clave}_n", 0) + 1
     st.session_state.pop(f"{clave}_foto", None)
+
+
+def boton_excel(semana: str, donde=None) -> None:
+    """«Descargar Excel» del consolidado semanal. El archivo se genera al pulsar; el usuario va
+    explícito porque st.download_button llama a su función por fuera de la sesión."""
+    quien = st.session_state["usuario"]["usuario"]
+    (donde or st).download_button(
+        "Descargar Excel", data=lambda: api.archivo(f"/reportes/consolidado-semanal/{semana}", quien),
+        file_name=f"Agritics_consolidado_{semana}.xlsx", type="primary", icon=":material/download:",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key=f"excel_{semana}")
 
 
 def cifra_grande(rotulo: str, valor: str, nota: str = "") -> None:
