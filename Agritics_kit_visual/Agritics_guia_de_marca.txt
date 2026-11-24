@@ -5,7 +5,8 @@ Noviembre de 2026 | Plataforma web para una finca familiar de Caldas
 1. NOMBRE, PROPÓSITO Y FIRMA
 
 Nombre del producto en la página, los reportes y el documento académico: Agritics.
-Escritura: A inicial y «tics» en minúscula. La denominación completa es «Agritics by Soagro». Se adopta Agritics para todas las piezas, incluida la descripción del proyecto que usa «Agritx».
+Escritura: A inicial y «tics» en minúscula. La denominación completa es «Agritics by Soagro».
+
 Descripción breve: «Mi finca en datos». Agritics reúne las labores del día, la cosecha de café y plátano, la lluvia, los movimientos de caja y los insumos. La familia puede volver a los registros que sustentan una cifra.
 Contexto: MVP de un Proyecto Empresarial de la Maestría en Business Analytics de la Universidad del Rosario. Tecnología: Streamlit, FastAPI y MongoDB. Las vistas de demostración con datos semilla de un año cafetero deben identificar esos datos como ejemplos.
 
