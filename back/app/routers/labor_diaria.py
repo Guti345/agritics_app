@@ -18,7 +18,11 @@ from back.app.reglas.operacion import (
     exigir_sin_labor_abierta,
     LABOR_ABIERTA,
 )
-from back.app.reglas.semana import exigir_semana_abierta
+from back.app.reglas.semana import (
+    auditar_escritura_en_periodo_cerrado,
+    exigir_periodo_abierto,
+    exigir_periodos_abiertos_en_correccion,
+)
 from back.app.schemas import (
     LaborCompletar,
     LaborDiariaCreate,
@@ -52,7 +56,7 @@ async def abrir(
     await exigir_lote_activo(db, datos.lote_id)
     labor = await exigir_labor_activa(db, datos.labor_id)
     exigir_admite_contrato(labor, datos.forma_pago)
-    await exigir_semana_abierta(db, datos.fecha, yo["rol"])
+    corte = await exigir_periodo_abierto(db, datos.fecha, yo["rol"])
     tid = a_oid(datos.trabajador_id)
     await exigir_en_pool(db, tid, datos.fecha)
     await exigir_sin_labor_abierta(db, tid, datos.fecha)
@@ -67,6 +71,7 @@ async def abrir(
         if consumo:
             await devolver_insumo(db, consumo.insumo_id, consumo.cantidad)
         raise
+    await auditar_escritura_en_periodo_cerrado(db, corte, yo, LABOR_DIARIA, guardado["_id"])
     return LaborDiariaResponse.model_validate(guardado)
 
 
@@ -80,7 +85,8 @@ async def completar(
     doc = await buscar_o_404(db[LABOR_DIARIA], id, "la labor diaria")
     if doc["completada"]:
         raise conflicto("Esta labor ya está completada")
-    await exigir_semana_abierta(db, doc["fecha"].date(), yo["rol"])
+    # Se permite completar aunque su fecha ya quedó dentro de un corte: se pagará
+    # (descontando sus anticipos) en el próximo corte.
     actualizado = await db[LABOR_DIARIA].find_one_and_update(
         {"_id": doc["_id"], "completada": False},
         {"$set": {
@@ -137,14 +143,12 @@ async def corregir_labor_diaria(
     yo: dict = Depends(ADMIN_O_MAYORDOMO),
 ):
     """Mismas reglas que al abrir, sobre el registro ya corregido. Semana cerrada: se
-    revisa la fecha vieja y la nueva (no se saca ni se mete nada a una semana cerrada)."""
+    revisa la fecha vieja y la nueva (no se saca ni se mete nada a un periodo cortado)."""
     doc = await buscar_o_404(db[LABOR_DIARIA], id, "la labor diaria")
     datos = cambios.model_dump(exclude_unset=True)
     fecha_vieja = doc["fecha"].date()
     fecha = datos.get("fecha") or fecha_vieja
-    await exigir_semana_abierta(db, fecha_vieja, yo["rol"])
-    if fecha != fecha_vieja:
-        await exigir_semana_abierta(db, fecha, yo["rol"])
+    await exigir_periodos_abiertos_en_correccion(db, fecha_vieja, fecha, yo["rol"])
 
     trabajador_id = datos.get("trabajador_id") or str(doc["trabajador_id"])
     if "trabajador_id" in datos:

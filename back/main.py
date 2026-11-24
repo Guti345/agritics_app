@@ -23,6 +23,7 @@ from back.app.routers import (
     auth,
     caja,
     compra_insumo,
+    cortes,
     cosecha_platano,
     gasto,
     health,
@@ -75,6 +76,6 @@ registrar_manejadores(app)
 for modulo in (
     health, auth, usuarios, lotes, labores, trabajadores, insumos, unidades,
     pool_semana, labor_diaria, cosecha_platano, venta_platano, venta_cafe, compra_insumo,
-    gasto, caja, lluvia, uploads, auditoria,
+    gasto, caja, lluvia, uploads, cortes, auditoria,
 ):
     app.include_router(modulo.router, prefix=API_PREFIX)

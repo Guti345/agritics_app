@@ -5,7 +5,11 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from back.app.auth import ADMIN, FINANZAS_LECTURA
 from back.app.database import COSECHA_PLATANO, VENTA_PLATANO, get_db
-from back.app.reglas.semana import exigir_semana_abierta, exigir_semanas_abiertas_en_correccion
+from back.app.reglas.semana import (
+    auditar_escritura_en_periodo_cerrado,
+    exigir_periodo_abierto,
+    exigir_periodos_abiertos_en_correccion,
+)
 from back.app.schemas import Calidad, VentaPlatanoCreate, VentaPlatanoResponse, VentaPlatanoUpdate
 from back.app.utils import buscar_o_404, campos_captura, corregir, filtro_fechas, insertar
 
@@ -42,9 +46,11 @@ async def crear(datos: VentaPlatanoCreate, db: AsyncIOMotorDatabase = Depends(ge
     """valor_total = kg x precio_kg lo verifica el DTO. cosecha_id (opcional) debe existir."""
     if datos.cosecha_id:
         await buscar_o_404(db[COSECHA_PLATANO], datos.cosecha_id, "la cosecha")
-    await exigir_semana_abierta(db, datos.fecha, yo["rol"])
+    corte = await exigir_periodo_abierto(db, datos.fecha, yo["rol"])
     doc = {**datos.a_mongo(), **campos_captura(yo)}
-    return VentaPlatanoResponse.model_validate(await insertar(db[VENTA_PLATANO], doc, "Esta venta ya está registrada"))
+    guardado = await insertar(db[VENTA_PLATANO], doc, "Esta venta ya está registrada")
+    await auditar_escritura_en_periodo_cerrado(db, corte, yo, VENTA_PLATANO, guardado["_id"])
+    return VentaPlatanoResponse.model_validate(guardado)
 
 
 @router.patch("/{id}", response_model=VentaPlatanoResponse, summary="Corregir venta de plátano (queda en auditoría)")
@@ -53,7 +59,7 @@ async def corregir_venta(
 ):
     doc = await buscar_o_404(db[VENTA_PLATANO], id, "la venta de plátano")
     datos = cambios.model_dump(exclude_unset=True)
-    await exigir_semanas_abiertas_en_correccion(db, doc["fecha"].date(), datos.get("fecha"), yo["rol"])
+    await exigir_periodos_abiertos_en_correccion(db, doc["fecha"].date(), datos.get("fecha"), yo["rol"])
     if datos.get("cosecha_id"):
         await buscar_o_404(db[COSECHA_PLATANO], datos["cosecha_id"], "la cosecha")
     actualizado = await corregir(db, VENTA_PLATANO, doc, VentaPlatanoCreate, datos, yo, "Esta venta ya está registrada")

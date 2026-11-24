@@ -7,7 +7,11 @@ from back.app.auth import ADMIN_O_MAYORDOMO, CUALQUIERA
 from back.app.database import LLUVIA, get_db
 from back.app.reglas.errores import conflicto
 from back.app.reglas.fotos import exigir_foto
-from back.app.reglas.semana import exigir_semana_abierta, exigir_semanas_abiertas_en_correccion
+from back.app.reglas.semana import (
+    auditar_escritura_en_periodo_cerrado,
+    exigir_periodo_abierto,
+    exigir_periodos_abiertos_en_correccion,
+)
 from back.app.schemas import (
     BOGOTA,
     LluviaCreate,
@@ -95,10 +99,12 @@ async def crear(datos: LluviaCreate, db: AsyncIOMotorDatabase = Depends(get_db),
     """fecha_hora es la hora REAL de la lectura (sin zona = hora de Colombia); mm de 0 a 500;
     foto del pluviómetro obligatoria (la valida el DTO y aquí se revisa que esté subida)."""
     exigir_foto(datos.foto_ruta)
-    await exigir_semana_abierta(db, _dia(datos.fecha_hora), yo["rol"])
+    corte = await exigir_periodo_abierto(db, _dia(datos.fecha_hora), yo["rol"])
     await _exigir_cupo_del_dia(db, datos.fecha_hora, datos.mm)
     doc = {**datos.a_mongo(), **campos_captura(yo)}
-    return LluviaResponse.model_validate(await insertar(db[LLUVIA], doc, "Ya hay una lectura de lluvia a esa hora"))
+    guardado = await insertar(db[LLUVIA], doc, "Ya hay una lectura de lluvia a esa hora")
+    await auditar_escritura_en_periodo_cerrado(db, corte, yo, LLUVIA, guardado["_id"])
+    return LluviaResponse.model_validate(guardado)
 
 
 @router.patch("/{id}", response_model=LluviaResponse, summary="Corregir lectura de lluvia (queda en auditoría)")
@@ -108,7 +114,7 @@ async def corregir_lectura(
     doc = await buscar_o_404(db[LLUVIA], id, "la lectura de lluvia")
     datos = cambios.model_dump(exclude_unset=True)
     nueva = fusionar(doc, LluviaCreate, datos)
-    await exigir_semanas_abiertas_en_correccion(db, _dia(doc["fecha_hora"]), _dia(nueva.fecha_hora), yo["rol"])
+    await exigir_periodos_abiertos_en_correccion(db, _dia(doc["fecha_hora"]), _dia(nueva.fecha_hora), yo["rol"])
     if datos.get("foto_ruta"):
         exigir_foto(datos["foto_ruta"])
     if "fecha_hora" in datos or "mm" in datos:

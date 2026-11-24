@@ -7,7 +7,11 @@ from back.app.auth import ADMIN, FINANZAS_LECTURA
 from back.app.database import COMPRA_INSUMO, INSUMOS, get_db
 from back.app.reglas.fotos import exigir_foto
 from back.app.reglas.operacion import descontar_insumo, devolver_insumo, sumar_stock
-from back.app.reglas.semana import exigir_semana_abierta, exigir_semanas_abiertas_en_correccion
+from back.app.reglas.semana import (
+    auditar_escritura_en_periodo_cerrado,
+    exigir_periodo_abierto,
+    exigir_periodos_abiertos_en_correccion,
+)
 from back.app.schemas import CompraInsumoCreate, CompraInsumoResponse, CompraInsumoUpdate
 from back.app.utils import a_oid, buscar_o_404, campos_captura, corregir, filtro_fechas, fusionar, insertar
 
@@ -45,13 +49,14 @@ async def crear(datos: CompraInsumoCreate, db: AsyncIOMotorDatabase = Depends(ge
     alcanza a guardarse, el stock se devuelve."""
     exigir_foto(datos.comprobante_ruta)
     await buscar_o_404(db[INSUMOS], datos.insumo_id, "el insumo")
-    await exigir_semana_abierta(db, datos.fecha, yo["rol"])
+    corte = await exigir_periodo_abierto(db, datos.fecha, yo["rol"])
     await sumar_stock(db, datos.insumo_id, datos.cantidad)
     try:
         guardada = await insertar(db[COMPRA_INSUMO], {**datos.a_mongo(), **campos_captura(yo)}, DUPLICADA)
     except Exception:
         await devolver_insumo(db, datos.insumo_id, -datos.cantidad)
         raise
+    await auditar_escritura_en_periodo_cerrado(db, corte, yo, COMPRA_INSUMO, guardada["_id"])
     return CompraInsumoResponse.model_validate(guardada)
 
 
@@ -63,7 +68,7 @@ async def corregir_compra(
     insumo ya se consumió y no alcanza para devolver, 409 y no se cambia nada."""
     doc = await buscar_o_404(db[COMPRA_INSUMO], id, "la compra")
     datos = cambios.model_dump(exclude_unset=True)
-    await exigir_semanas_abiertas_en_correccion(db, doc["fecha"].date(), datos.get("fecha"), yo["rol"])
+    await exigir_periodos_abiertos_en_correccion(db, doc["fecha"].date(), datos.get("fecha"), yo["rol"])
     if datos.get("comprobante_ruta"):
         exigir_foto(datos["comprobante_ruta"])
     nueva = fusionar(doc, CompraInsumoCreate, datos)  # valida TODO antes de mover stock

@@ -1,6 +1,6 @@
 """DTOs de labor diaria (trabajador x día x lote x labor)."""
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from .enums import FormaPago, TipoMeta
 from .campos import Fecha, FechaHoraOut, FechaOut, Jornales, NoNegativo, OidIn, OidOut, Positivo
@@ -38,6 +38,14 @@ class InsumoConsumidoResponse(BaseModel):
     cantidad: float
 
 
+class AnticipoLaborResponse(BaseModel):
+    """Anticipo embebido en la labor: lo que se adelantó en un corte."""
+    corte: int
+    semana: str | None = None
+    valor: float
+    fecha: FechaHoraOut
+
+
 class LaborDiariaResponse(SalidaCaptura):
     fecha: FechaOut
     trabajador_id: OidOut
@@ -51,6 +59,9 @@ class LaborDiariaResponse(SalidaCaptura):
     completada: bool
     insumo_consumido: InsumoConsumidoResponse | None = None
     fecha_cierre: FechaHoraOut | None = None
+    anticipos: list[AnticipoLaborResponse] = Field(default_factory=list)
+    corte: int | None = None            # corte que la pagó...
+    corte_semana: str | None = None     # ...y su semana (el número se reinicia cada semana)
 
 
 # PATCH: se corrige todo menos `completada` (va por /completar) e `insumo_consumido`

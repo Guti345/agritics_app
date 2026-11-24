@@ -6,8 +6,8 @@ from back.app.auth import ADMIN_O_MAYORDOMO, CUALQUIERA
 from back.app.database import LABOR_DIARIA, POOL_SEMANA, TRABAJADORES, get_db
 from back.app.reglas.auditoria import registrar_correccion
 from back.app.reglas.errores import conflicto
-from back.app.reglas.operacion import exigir_labor_activa, exigir_lote_activo, lunes_de
-from back.app.reglas.semana import exigir_semana_abierta, semana_iso
+from back.app.reglas.operacion import exigir_labor_activa, exigir_lote_activo
+from back.app.reglas.semana import semana_cortada_completa, semana_iso
 from back.app.schemas import (
     PoolActivar,
     PoolDesactivar,
@@ -22,6 +22,17 @@ from back.app.utils import a_oid, buscar_o_404, campos_captura, insertar, semana
 router = APIRouter(prefix="/pool", tags=["Pool de la semana"])
 
 YA_ACTIVO = "Este trabajador ya está activo en la semana"
+
+
+async def _exigir_semana_no_cortada(db: AsyncIOMotorDatabase, semana: str, rol: str) -> None:
+    """Un corte cierra un periodo, no la semana: el pool se puede mover mientras queden
+    días sin cortar. Solo si la semana ya quedó cortada completa, únicamente el administrador."""
+    corte = await semana_cortada_completa(db, semana)
+    if corte is not None and rol != "administrador":
+        raise conflicto(
+            f"La semana {semana} ya quedó cortada completa (corte {corte['corte']}); "
+            "solo el administrador puede cambiar su pool"
+        )
 
 
 @router.post("/activar", response_model=PoolSemanaResponse, status_code=status.HTTP_201_CREATED,
@@ -39,7 +50,7 @@ async def activar(
     for p in datos.preasignacion:
         await exigir_lote_activo(db, p.lote_id)
         await exigir_labor_activa(db, p.labor_id)
-    await exigir_semana_abierta(db, lunes_de(datos.semana), yo["rol"])
+    await _exigir_semana_no_cortada(db, datos.semana, yo["rol"])
 
     tid = a_oid(datos.trabajador_id)
     existente = await db[POOL_SEMANA].find_one({"trabajador_id": tid, "semana": datos.semana})
@@ -75,7 +86,7 @@ async def desactivar(
     existente = await db[POOL_SEMANA].find_one({"trabajador_id": tid, "semana": datos.semana, "activo": True})
     if existente is None:
         raise conflicto(f"Este trabajador no está activo en la semana {datos.semana}")
-    await exigir_semana_abierta(db, lunes_de(datos.semana), yo["rol"])
+    await _exigir_semana_no_cortada(db, datos.semana, yo["rol"])
     if await db[LABOR_DIARIA].find_one({"trabajador_id": tid, "completada": False}, {"_id": 1}):
         raise conflicto("Este trabajador tiene una labor abierta; complétala antes de sacarlo del pool")
     actualizado = await db[POOL_SEMANA].find_one_and_update(

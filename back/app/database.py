@@ -56,13 +56,15 @@ COMPRA_INSUMO = "compra_insumo"
 GASTO = "gasto"
 MOVIMIENTO_CAJA = "movimiento_caja"
 LLUVIA = "lluvia"
+# Cortes de nómina: periodos cerrados dentro de la semana ISO
+CIERRES = "cierres"
 # Correcciones (nada se borra: los cambios quedan aquí)
 AUDITORIA = "auditoria"
 
 COLECCIONES = (
     LOTES, LABORES, TRABAJADORES, INSUMOS, UNIDADES, USUARIOS,
     LABOR_DIARIA, POOL_SEMANA, COSECHA_PLATANO, VENTA_PLATANO, VENTA_CAFE,
-    COMPRA_INSUMO, GASTO, MOVIMIENTO_CAJA, LLUVIA, AUDITORIA,
+    COMPRA_INSUMO, GASTO, MOVIMIENTO_CAJA, LLUVIA, CIERRES, AUDITORIA,
 )
 
 # --- Cliente ----------------------------------------------------------------

@@ -5,7 +5,11 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from back.app.auth import ADMIN, FINANZAS_LECTURA
 from back.app.database import GASTO, get_db
-from back.app.reglas.semana import exigir_semana_abierta, exigir_semanas_abiertas_en_correccion
+from back.app.reglas.semana import (
+    auditar_escritura_en_periodo_cerrado,
+    exigir_periodo_abierto,
+    exigir_periodos_abiertos_en_correccion,
+)
 from back.app.schemas import CategoriaGasto, GastoCreate, GastoResponse, GastoUpdate
 from back.app.utils import buscar_o_404, campos_captura, corregir, filtro_fechas, insertar
 
@@ -36,9 +40,11 @@ async def ver(id: str, db: AsyncIOMotorDatabase = Depends(get_db), _: dict = Dep
 @router.post("", response_model=GastoResponse, status_code=status.HTTP_201_CREATED, summary="Registrar gasto")
 async def crear(datos: GastoCreate, db: AsyncIOMotorDatabase = Depends(get_db), yo: dict = Depends(ADMIN)):
     """La categoría va en el enum; 'otros' exige descripción (lo valida el DTO)."""
-    await exigir_semana_abierta(db, datos.fecha, yo["rol"])
+    corte = await exigir_periodo_abierto(db, datos.fecha, yo["rol"])
     doc = {**datos.a_mongo(), **campos_captura(yo)}
-    return GastoResponse.model_validate(await insertar(db[GASTO], doc, "Este gasto ya está registrado"))
+    guardado = await insertar(db[GASTO], doc, "Este gasto ya está registrado")
+    await auditar_escritura_en_periodo_cerrado(db, corte, yo, GASTO, guardado["_id"])
+    return GastoResponse.model_validate(guardado)
 
 
 @router.patch("/{id}", response_model=GastoResponse, summary="Corregir gasto (queda en auditoría)")
@@ -47,6 +53,6 @@ async def corregir_gasto(
 ):
     doc = await buscar_o_404(db[GASTO], id, "el gasto")
     datos = cambios.model_dump(exclude_unset=True)
-    await exigir_semanas_abiertas_en_correccion(db, doc["fecha"].date(), datos.get("fecha"), yo["rol"])
+    await exigir_periodos_abiertos_en_correccion(db, doc["fecha"].date(), datos.get("fecha"), yo["rol"])
     actualizado = await corregir(db, GASTO, doc, GastoCreate, datos, yo, "Este gasto ya está registrado")
     return GastoResponse.model_validate(actualizado)

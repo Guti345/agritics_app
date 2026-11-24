@@ -1,6 +1,6 @@
 """Crea las colecciones de Agritics con sus validadores $jsonSchema e índices.
 
-Uso:    python -m back.init_db
+Uso:    python -m back.init_db [--actualizar-validadores]
 Desde código (datos_mongo.py):   from back.init_db import init_db;  await init_db()
 
 IDEMPOTENTE: si una colección ya existe, se deja como está (no se recrea, no se
@@ -23,6 +23,7 @@ Convenciones del esquema:
 """
 
 import asyncio
+import sys
 
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pymongo import ASCENDING, DESCENDING
@@ -87,6 +88,7 @@ CULTIVOS = arreglo(enum("cafe", "platano"), min_items=1, unicos=True)
 CALIDAD_PLATANO = enum("primera", "segunda")
 TIPO_META = enum("kilos", "horas", "completada")
 AUDIT_CAPTURA = {"registrado_por": TEXTO, "fecha_captura": FECHA}
+SEMANA_ISO = {"bsonType": "string", "pattern": r"^\d{4}-W(0[1-9]|[1-4]\d|5[0-3])$"}  # "2026-W48"
 
 GEOJSON = objeto(
     {
@@ -208,8 +210,17 @@ COLECCIONES[db.LABOR_DIARIA] = (
             ),
             **AUDIT_CAPTURA,
             "fecha_cierre": {"bsonType": ["date", "null"]},
+            # Anticipos de un corte sobre una labor a contrato ABIERTA (plata adelantada
+            # sin cerrar la labor); al completarla se paga lo pactado menos lo adelantado.
+            "anticipos": arreglo(objeto(
+                {"corte": ENTERO_POSITIVO, "valor": POSITIVO, "fecha": FECHA, "semana": SEMANA_ISO},
+                ["corte", "valor", "fecha"],
+            )),
+            # Marca del corte que la pagó (el número se reinicia cada semana: va con su semana).
+            "corte": ENTERO_POSITIVO,
+            "corte_semana": SEMANA_ISO,
         },
-        opcionales=("tipo_meta", "insumo_consumido", "fecha_cierre"),
+        opcionales=("tipo_meta", "insumo_consumido", "fecha_cierre", "anticipos", "corte", "corte_semana"),
         # A contrato, tipo_meta es obligatorio.
         anyOf=[
             {"properties": {"forma_pago": enum("jornal")}},
@@ -234,7 +245,7 @@ COLECCIONES[db.POOL_SEMANA] = (
     {"$jsonSchema": documento(
         {
             "trabajador_id": OID,
-            "semana": {"bsonType": "string", "pattern": r"^\d{4}-W(0[1-9]|[1-4]\d|5[0-3])$"},
+            "semana": SEMANA_ISO,
             "activo": BOOL,
             "preasignacion": arreglo(objeto(
                 {"dia": FECHA, "lote_id": OID, "labor_id": OID},
@@ -385,6 +396,25 @@ COLECCIONES[db.LLUVIA] = (
     [([("fecha_hora", ASCENDING)], {"unique": True})],
 )
 
+# ---------- Cortes de nómina ----------
+# La semana ISO (lunes-domingo) es solo el contenedor: dentro puede haber varios cortes
+# ("hasta aquí se paga"); lo que se cierra son PERIODOS [desde, hasta], apilados.
+COLECCIONES[db.CIERRES] = (
+    {"$jsonSchema": documento({
+        "semana": SEMANA_ISO,
+        "corte": ENTERO_POSITIVO,           # consecutivo dentro de la semana: 1, 2, 3...
+        "desde": FECHA,
+        "hasta": FECHA,
+        "cerrada_por": TEXTO,
+        "fecha": FECHA,                     # momento real del corte
+        "anticipos": arreglo(objeto(        # puede ir vacía
+            {"labor_diaria_id": OID, "trabajador_id": OID, "valor": POSITIVO},
+            ["labor_diaria_id", "trabajador_id", "valor"],
+        )),
+    })},
+    [([("semana", ASCENDING), ("corte", ASCENDING)], {"unique": True})],
+)
+
 # ---------- Auditoría (sin validador estricto) ----------
 # Campos: fecha, usuario, coleccion, documento_id, campo, valor_anterior, valor_nuevo.
 COLECCIONES[db.AUDITORIA] = (
@@ -400,8 +430,12 @@ assert set(COLECCIONES) == set(db.COLECCIONES), "init_db y db.COLECCIONES no coi
 
 # --- Ejecución ---------------------------------------------------------------
 
-async def init_db(base: AsyncIOMotorDatabase | None = None) -> dict[str, str]:
-    """Crea lo que falte. Devuelve {colección: "creada" | "ya existía"}."""
+async def init_db(base: AsyncIOMotorDatabase | None = None, actualizar_validadores: bool = False) -> dict[str, str]:
+    """Crea lo que falte. Devuelve {colección: "creada" | "ya existía" | "validador actualizado"}.
+
+    Con `actualizar_validadores=True` (python -m back.init_db --actualizar-validadores)
+    reaplica con collMod el validador de las colecciones que ya existían, para que un
+    cambio de esquema llegue a una base ya creada. Sin la opción, no las toca."""
     base = base if base is not None else db.get_db()
     existentes = set(await base.list_collection_names())
     resultado: dict[str, str] = {}
@@ -409,6 +443,9 @@ async def init_db(base: AsyncIOMotorDatabase | None = None) -> dict[str, str]:
     for nombre, (validador, indices) in COLECCIONES.items():
         if nombre in existentes:
             resultado[nombre] = "ya existía"
+            if actualizar_validadores and validador:
+                await base.command("collMod", nombre, validator=validador)
+                resultado[nombre] = "validador actualizado"
         else:
             opciones = {"validator": validador} if validador else {}
             try:
@@ -428,16 +465,18 @@ async def init_db(base: AsyncIOMotorDatabase | None = None) -> dict[str, str]:
 
 
 async def _main() -> None:
-    resultado = await init_db()
+    resultado = await init_db(actualizar_validadores="--actualizar-validadores" in sys.argv)
     base = db.get_db()
     print(f"Base '{db.MONGO_DB}':")
     for nombre, estado in resultado.items():
         info = await (await base.list_collections(filter={"name": nombre})).to_list(1)
         con_validador = "con validador" if info and info[0].get("options", {}).get("validator") else "sin validador"
         n_indices = len(await base[nombre].index_information()) - 1  # sin contar _id
-        print(f"  {nombre:<16} {estado:<11} {con_validador:<14} {n_indices} índice(s)")
+        print(f"  {nombre:<16} {estado:<21} {con_validador:<14} {n_indices} índice(s)")
     creadas = sum(1 for e in resultado.values() if e == "creada")
-    print(f"{creadas} creada(s), {len(resultado) - creadas} ya existía(n). Total: {len(resultado)}.")
+    actualizadas = sum(1 for e in resultado.values() if e == "validador actualizado")
+    print(f"{creadas} creada(s), {len(resultado) - creadas} ya existía(n)"
+          + (f" ({actualizadas} con validador actualizado)" if actualizadas else "") + f". Total: {len(resultado)}.")
     db.close_client()
 
 

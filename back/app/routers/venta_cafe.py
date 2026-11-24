@@ -7,7 +7,11 @@ from back.app.auth import ADMIN, FINANZAS_LECTURA
 from back.app.database import VENTA_CAFE, get_db
 from back.app.reglas.catalogos import exigir_nombre_libre
 from back.app.reglas.fotos import exigir_foto
-from back.app.reglas.semana import exigir_semana_abierta, exigir_semanas_abiertas_en_correccion
+from back.app.reglas.semana import (
+    auditar_escritura_en_periodo_cerrado,
+    exigir_periodo_abierto,
+    exigir_periodos_abiertos_en_correccion,
+)
 from back.app.schemas import TipoProductoCafe, VentaCafeCreate, VentaCafeResponse, VentaCafeUpdate
 from back.app.utils import buscar_o_404, campos_captura, corregir, filtro_fechas, insertar
 
@@ -47,11 +51,11 @@ async def crear(datos: VentaCafeCreate, db: AsyncIOMotorDatabase = Depends(get_d
     exigir_foto(datos.foto_ruta)
     if datos.id_comprobante:
         await exigir_nombre_libre(db[VENTA_CAFE], "id_comprobante", datos.id_comprobante, _duplicado(datos.id_comprobante))
-    await exigir_semana_abierta(db, datos.fecha, yo["rol"])
+    corte = await exigir_periodo_abierto(db, datos.fecha, yo["rol"])
     doc = {**datos.a_mongo(), **campos_captura(yo)}
-    return VentaCafeResponse.model_validate(
-        await insertar(db[VENTA_CAFE], doc, _duplicado(datos.id_comprobante or ""))
-    )
+    guardado = await insertar(db[VENTA_CAFE], doc, _duplicado(datos.id_comprobante or ""))
+    await auditar_escritura_en_periodo_cerrado(db, corte, yo, VENTA_CAFE, guardado["_id"])
+    return VentaCafeResponse.model_validate(guardado)
 
 
 @router.patch("/{id}", response_model=VentaCafeResponse, summary="Corregir recibo de café (queda en auditoría)")
@@ -60,7 +64,7 @@ async def corregir_venta(
 ):
     doc = await buscar_o_404(db[VENTA_CAFE], id, "la venta de café")
     datos = cambios.model_dump(exclude_unset=True)
-    await exigir_semanas_abiertas_en_correccion(db, doc["fecha"].date(), datos.get("fecha"), yo["rol"])
+    await exigir_periodos_abiertos_en_correccion(db, doc["fecha"].date(), datos.get("fecha"), yo["rol"])
     if datos.get("foto_ruta"):
         exigir_foto(datos["foto_ruta"])
     if datos.get("id_comprobante"):
