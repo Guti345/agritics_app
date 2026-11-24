@@ -27,20 +27,26 @@ MVP del Proyecto Empresarial - Maestría en Business Analytics, Universidad del 
 ```
 agritics_app/
   Agritics_kit_visual/   # marca: logos, paleta, fuentes, íconos (assets/ para la app)
-  backend/               # FastAPI: main.py, routers/, dtos/, reglas/, db.py
-  frontend/              # Streamlit: app.py, .streamlit/config.toml, pantallas por rol
+  back/                  # FastAPI
+    main.py              #   app, ruta base /api/v1, Swagger en /docs
+    init_db.py           #   crea colecciones con validadores $jsonSchema e índices
+    datos_mongo.py       #   carga los datos simulados (un año cafetero: enero - semana 46 2026)
+    app/                 #   database.py, schemas.py, routers/, reglas/
+  front/                 # Streamlit: app.py, pages/, assets/, .streamlit/config.toml
   fotos/                 # imágenes subidas por la app (ruta guardada en el documento)
-  seed.py                # carga los datos simulados (un año cafetero: enero - semana 46 2026)
+  .env.example           # MONGO_URI y MONGO_DB (copiar a .env)
   requirements.txt
 ```
 
 ## Cómo correr el MVP
 
+Desde la raíz del repo, con un `.env` creado a partir de `.env.example`:
+
 ```bash
 pip install -r requirements.txt
-python seed.py                      # deja la base con el año simulado
-uvicorn backend.main:app --reload   # API en http://localhost:8000, Swagger en /docs
-streamlit run frontend/app.py       # app en http://localhost:8501
+python back/datos_mongo.py          # crea las colecciones y deja la base con el año simulado
+uvicorn back.main:app --reload      # API en http://localhost:8000, Swagger en /docs
+streamlit run front/app.py          # app en http://localhost:8501
 ```
 
 ## Qué se decidió (memoria del planteamiento, D1-D81)
