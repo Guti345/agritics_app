@@ -7,7 +7,7 @@ variable está en el entorno y también en el .env, gana la del entorno.
 
 Recordatorio de la regla transversal: Mongo es la SEGUNDA línea de defensa
 (validadores $jsonSchema e índices únicos). Toda regla de negocio se valida antes,
-en la capa de DTOs/reglas, y falla con HTTPException y mensaje en español.
+en la capa de schemas/reglas, y falla con HTTPException y mensaje en español.
 """
 
 import os
@@ -21,7 +21,7 @@ from motor.motor_asyncio import (
 )
 
 # .env de la raíz del repo, sin importar desde qué carpeta se lance uvicorn.
-load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=False)
+load_dotenv(Path(__file__).resolve().parents[2] / ".env", override=False)  # back/app/ -> raíz
 
 
 
