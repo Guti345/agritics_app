@@ -1,0 +1,32 @@
+[theme]
+base = "light"
+primaryColor = "#004846"
+backgroundColor = "#FFF4E8"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#004846"
+# Montserrat es la familia de la marca (guía, sección 5); Arial de respaldo.
+font = "Montserrat, Arial, sans-serif"
+
+[[theme.fontFaces]]
+family = "Montserrat"
+url = "app/static/fuentes/Montserrat-Regular.ttf"
+weight = 400
+
+[[theme.fontFaces]]
+family = "Montserrat"
+url = "app/static/fuentes/Montserrat-SemiBold.ttf"
+weight = 600
+
+[[theme.fontFaces]]
+family = "Montserrat"
+url = "app/static/fuentes/Montserrat-Bold.ttf"
+weight = 700
+
+[server]
+# Sirve front/static/ (las fuentes) en app/static/.
+enableStaticServing = true
+
+[client]
+# El menú lo arma app.py con st.navigation según el rol: nunca el listado automático de pages/.
+showSidebarNavigation = false
+toolbarMode = "minimal"
