@@ -1,0 +1,1 @@
+"""Agritics API (backend FastAPI)."""
