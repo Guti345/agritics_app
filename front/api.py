@@ -38,14 +38,16 @@ def _a_json(valor):
     return valor
 
 
-def _cabeceras() -> dict:
-    usuario = st.session_state.get("usuario")
-    return {"X-Usuario": usuario["usuario"]} if usuario else {}
+def _cabeceras(usuario: str | None = None) -> dict:
+    if usuario is None:
+        sesion = st.session_state.get("usuario")
+        usuario = sesion["usuario"] if sesion else None
+    return {"X-Usuario": usuario} if usuario else {}
 
 
-def _pedir(metodo: str, ruta: str, **kwargs):
+def _pedir(metodo: str, ruta: str, usuario: str | None = None, **kwargs):
     try:
-        r = requests.request(metodo, f"{BASE}{ruta}", headers=_cabeceras(), timeout=ESPERA, **kwargs)
+        r = requests.request(metodo, f"{BASE}{ruta}", headers=_cabeceras(usuario), timeout=ESPERA, **kwargs)
     except requests.RequestException:
         raise ErrorApi(None, SIN_CONEXION) from None
     if r.ok:
@@ -74,6 +76,12 @@ def post(ruta: str, datos: dict | None = None, archivos: dict | None = None):
 
 def patch(ruta: str, datos: dict):
     return _pedir("PATCH", ruta, json=_a_json(datos))
+
+
+def archivo(ruta: str, usuario: str) -> bytes:
+    """Descarga un archivo (p. ej. el Excel). `usuario` va explícito: st.download_button
+    llama a su función por fuera de la sesión, donde no se ve st.session_state."""
+    return _pedir("GET", ruta, usuario=usuario)
 
 
 def login(usuario: str, clave: str) -> dict:

@@ -9,7 +9,7 @@ Reglas de UX que se aplican desde aquí:
 """
 
 from collections.abc import Callable, Iterable
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from html import escape
 from pathlib import Path
 
@@ -63,6 +63,9 @@ table.ag-cal td.hoy {background: #FFF4E8;}
 .ag-chip.real.completada {background: #004846; color: #FFF4E8; border: 2px solid #004846;}
 .ag-leyenda {display: flex; flex-wrap: wrap; gap: .5rem; font-size: 13px; margin: .2rem 0 .6rem;}
 .ag-leyenda .ag-chip {display: inline-block; margin: 0;}
+.ag-cifra {background: #FFFFFF; border: 1px solid #EBE2DD; border-radius: 8px; padding: .8rem 1rem;}
+.ag-cifra div {font-size: 32px; font-weight: 700; line-height: 1.2;}
+.ag-cifra small {font-size: 14px; opacity: .85;}
 </style>
 """
 
@@ -102,6 +105,27 @@ def rotulo_semana(semana: str) -> str:
 def semana_en_curso(dia: date | None = None) -> str:
     """'Semana 48: 23-29 nov' (ISO, lunes a domingo), calculada de la fecha real."""
     return rotulo_semana(semana_iso(dia))
+
+
+def elegir_semana(rotulo: str = "Semana", key: str = "semana", donde=None,
+                  adelante: int = 0, atras: int = 53) -> str:
+    """Selector de semana ISO (por defecto la semana en curso). Devuelve '2026-W48'."""
+    base = hoy()
+    opciones = [semana_iso(base + timedelta(weeks=adelante - k)) for k in range(adelante + atras + 1)]
+    return (donde or st).selectbox(rotulo, opciones, index=adelante, format_func=rotulo_semana, key=key)
+
+
+def a_fecha(valor) -> date:
+    """'2026-11-24' (o date) -> date."""
+    return valor if isinstance(valor, date) else date.fromisoformat(str(valor)[:10])
+
+
+def fecha_hora(valor: str) -> str:
+    """'2026-11-24T22:15:00Z' -> '24 nov 2026 17:15' (hora de Colombia)."""
+    momento = datetime.fromisoformat(str(valor).replace("Z", "+00:00"))
+    if momento.tzinfo is not None:
+        momento = momento.astimezone(BOGOTA)
+    return f"{fecha_corta(momento.date())} {momento:%H:%M}"
 
 
 def dia_corto(dia: date) -> str:
@@ -154,7 +178,9 @@ def tabla(df: pd.DataFrame, dinero: Iterable[str] = (), kilos: Iterable[str] = (
     for columnas, formato in ((dinero, pesos), (kilos, kg), (cifras, lambda v: numero(v, 1).removesuffix(",0"))):
         for col in columnas:
             df[col] = df[col].map(lambda v: "" if pd.isna(v) else formato(v))
-            config.setdefault(col, st.column_config.TextColumn(col, alignment="right"))
+            # Ancho explícito: el automático se calcula antes de cargar Montserrat (más ancha) y recorta cifras.
+            ancho = max([len(col), *(len(x) for x in df[col])]) * 9 + 28
+            config.setdefault(col, st.column_config.TextColumn(col, alignment="right", width=ancho))
     st.dataframe(df, hide_index=True, column_config=config, **kwargs)
 
 
@@ -203,10 +229,14 @@ def en_construccion(titulo: str, para_que: str) -> None:
 # ── envío de formularios ───────────────────────────────────────────────────────
 
 _AVISO = "_aviso_guardado"
+_LIMPIAR = "_campos_por_limpiar"
 
 
 def aviso_guardado() -> None:
-    """Muestra (una vez) el 'Registro guardado' que dejó enviar() antes de recargar."""
+    """Al empezar cada recarga, antes de la pantalla: vacía los campos que dejó enviar() y
+    muestra (una vez) su 'Registro guardado'."""
+    for clave, vacio in st.session_state.pop(_LIMPIAR, {}).items():
+        st.session_state[clave] = vacio
     mensaje = st.session_state.pop(_AVISO, None)
     if mensaje:
         st.success(mensaje, icon=":material/check_circle:")
@@ -224,13 +254,73 @@ def enviar(accion: Callable[[], object], limpiar: Iterable[str] = (),
     except api.ErrorApi as e:
         (donde or st).error(e.detalle, icon=":material/error:")
         return None
+    # Borrar la clave no basta: el navegador seguiría mostrando el valor viejo. Se deja el valor
+    # vacío pendiente y app.py lo asigna al empezar la recarga, ANTES de dibujar los campos.
+    pendientes = {}
     for clave in limpiar:
-        st.session_state.pop(clave, None)
+        if clave not in st.session_state:
+            continue
+        valor = st.session_state[clave]
+        if isinstance(valor, bool):
+            pendientes[clave] = False
+        elif isinstance(valor, str):
+            pendientes[clave] = ""
+        elif isinstance(valor, (list, tuple)):
+            pendientes[clave] = []
+        elif isinstance(valor, (date, time, dict)):     # fechas: vuelven a su valor por defecto
+            st.session_state.pop(clave)
+        else:
+            pendientes[clave] = None
+    st.session_state[_LIMPIAR] = pendientes
     if refrescar:
         api.refrescar_listas()
     st.session_state[_AVISO] = exito
     st.rerun()
     return resultado
+
+
+FORMATOS_FOTO = ["jpg", "jpeg", "png", "webp", "heic", "heif"]
+
+
+def foto(clave: str, rotulo: str) -> str | None:
+    """Foto obligatoria de un registro (recibo, comprobante...). Se sube a la API apenas se
+    elige, UNA vez por archivo, y su ruta queda en la sesión: si el registro falla, al
+    reintentar no se vuelve a subir. Devuelve la ruta (o None si no hay foto)."""
+    n = st.session_state.setdefault(f"{clave}_n", 0)
+    archivo = st.file_uploader(rotulo, type=FORMATOS_FOTO, key=f"{clave}_archivo_{n}")
+    subida = st.session_state.get(f"{clave}_foto")
+    if archivo is None:
+        st.session_state.pop(f"{clave}_foto", None)
+        return None
+    if subida is None or subida["archivo"] != archivo.file_id:
+        try:
+            r = api.post("/uploads/foto", archivos={"archivo": (archivo.name, archivo.getvalue(), archivo.type)})
+        except api.ErrorApi as e:
+            st.session_state.pop(f"{clave}_foto", None)
+            st.error(e.detalle, icon=":material/error:")
+            return None
+        subida = st.session_state[f"{clave}_foto"] = {"archivo": archivo.file_id, "ruta": r["ruta"]}
+    if archivo.type in ("image/jpeg", "image/png", "image/webp"):
+        st.image(archivo, width=200, caption="Foto adjunta")
+    else:
+        st.caption(f":material/check_circle: Foto adjunta: {archivo.name}")
+    return subida["ruta"]
+
+
+def foto_nueva(clave: str) -> None:
+    """Tras guardar: el uploader vuelve a quedar vacío para el siguiente registro."""
+    st.session_state[f"{clave}_n"] = st.session_state.get(f"{clave}_n", 0) + 1
+    st.session_state.pop(f"{clave}_foto", None)
+
+
+def cifra_grande(rotulo: str, valor: str, nota: str = "") -> None:
+    """Indicador destacado (guía: Bold 28-32 px, unidad al lado)."""
+    st.html(f"<div class='ag-cifra'><small>{escape(rotulo)}</small><div>{escape(valor)}</div>"
+            f"{f'<small>{escape(nota)}</small>' if nota else ''}</div>")
+
+
+def sin_datos(texto: str = "Sin registros") -> None:
+    st.caption(texto)
 
 
 def leer(accion: Callable[[], object]):

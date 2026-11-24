@@ -17,7 +17,6 @@ UNIDAD = {"kg": "kg", "hectareas": "ha", "jornales": "jornales", "racimos": "rac
 METAS = {"kilos": "Por kilos", "horas": "Por horas", "completada": "Labor completada"}
 TARIFA = {"jornal": "Tarifa ($ por jornal)", "kilos": "Tarifa ($ por kilo)",
           "horas": "Tarifa ($ por hora)", "completada": "Tarifa ($ por la labor)"}
-CULTIVOS = {"cafe": "Café", "platano": "Plátano", "bosque": "Bosque"}
 
 
 def rotulo_avance(labor: dict) -> str | None:
@@ -43,7 +42,9 @@ with labor_tab:
     labores = [l for l in ui.leer(lambda: api.lista("/labores")) if l["activa"]]
     insumos = ui.leer(lambda: api.lista("/insumos"))
 
-    nuevo_trab, nueva_labor = st.columns(2)
+    # El catálogo de labores (las 14 estables de la finca) lo maneja solo el administrador,
+    # en Catálogos. Aquí el mayordomo solo puede crear trabajadores.
+    nuevo_trab, _ = st.columns(2)
     with nuevo_trab.expander("+ Crear trabajador"):
         with st.form("nuevo_trabajador", border=False):
             nombre = st.text_input("Nombre", key="nt_nombre")
@@ -59,25 +60,6 @@ with labor_tab:
                     return t
                 ui.enviar(crear_trabajador, limpiar=["nt_nombre", "nt_documento", "nt_telefono"],
                           exito=f"Trabajador creado: {nombre.strip()}", refrescar=True)
-
-    with nueva_labor.expander("+ Crear labor"):
-        if not ui.puede("administrador", "superusuario"):
-            st.caption("Las labores nuevas las crea el administrador.")
-        else:
-            with st.form("nueva_labor", border=False):
-                nombre_l = st.text_input("Nombre", key="nl_nombre")
-                cultivos = st.multiselect("Cultivos", list(CULTIVOS), format_func=CULTIVOS.get, key="nl_cultivos")
-                unidad = st.selectbox("Unidad de avance", list(UNIDAD), key="nl_unidad",
-                                      format_func=lambda u: UNIDAD[u] or "sin avance")
-                admite = st.checkbox("Admite contrato", key="nl_admite")
-                meta = st.selectbox("Tipo de meta (si es por contrato)", [None, *METAS], key="nl_meta",
-                                    format_func=lambda m: METAS.get(m, "—"))
-                if st.form_submit_button("Crear labor", type="primary"):
-                    ui.enviar(lambda: api.post("/labores", {"nombre": nombre_l, "cultivos": cultivos,
-                                                            "unidad_avance": unidad, "admite_contrato": admite,
-                                                            "tipo_meta": meta}),
-                              limpiar=["nl_nombre", "nl_cultivos", "nl_unidad", "nl_admite", "nl_meta"],
-                              exito=f"Labor creada: {nombre_l.strip()}", refrescar=True)
 
     # Sin st.form: los campos dependen unos de otros (labor -> forma de pago -> meta).
     # Lo digitado vive en st.session_state (key=...) y solo se limpia al guardar.

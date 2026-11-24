@@ -14,6 +14,7 @@ st.set_page_config(page_title="Agritics", page_icon=Image.open(ui.ICONO_APP), la
 ui.estilos()
 
 # Pantallas por rol; la primera es la inicial. Las rutas son relativas a este archivo.
+# Un rol puede tener secciones ({sección: [pantallas]}) o una lista simple.
 CAMPO = [
     ("pages/captura.py", "Captura rápida", ":material/edit_note:"),
     ("pages/calendario.py", "Calendario de asignaciones", ":material/calendar_month:"),
@@ -22,11 +23,24 @@ CAMPO = [
 ]
 PANTALLAS = {
     "mayordomo": CAMPO,
-    # El administrador también puede escribir lo de campo (la API lo deja: ADMIN_O_MAYORDOMO).
-    "administrador": [
-        ("pages/tablero_semana.py", "Tablero de la semana", ":material/calendar_view_week:"),
-        *CAMPO,
-    ],
+    "administrador": {
+        "La semana": [
+            ("pages/tablero_semana.py", "Tablero de la semana", ":material/calendar_view_week:"),
+            ("pages/nomina.py", "Nómina de la semana", ":material/badge:"),
+            ("pages/cortes.py", "Cortes de nómina", ":material/content_cut:"),
+        ],
+        "Libro contable": [
+            ("pages/libro.py", "Ventas, compras y gastos", ":material/receipt_long:"),
+            ("pages/caja.py", "Caja", ":material/account_balance_wallet:"),
+        ],
+        # El administrador también puede escribir lo de campo (la API lo deja: ADMIN_O_MAYORDOMO).
+        "Campo": CAMPO,
+        "Administración": [
+            ("pages/catalogos.py", "Catálogos", ":material/list_alt:"),
+            ("pages/trazabilidad.py", "Trazabilidad y Excel", ":material/history:"),
+            ("pages/reportes.py", "Reportes", ":material/bar_chart:"),   # R1-R3 con gráficos: F4
+        ],
+    },
     "junta": [
         ("pages/tablero_kpis.py", "Tablero de KPIs", ":material/monitoring:"),
     ],
@@ -34,6 +48,20 @@ PANTALLAS = {
         ("pages/usuarios.py", "Usuarios", ":material/group:"),
     ],
 }
+
+
+def paginas(pantallas):
+    """st.Page de cada pantalla (la primera de todas es la inicial), en lista o por secciones."""
+    primera = True
+
+    def pagina(ruta, titulo, icono):
+        nonlocal primera
+        p = st.Page(ruta, title=titulo, icon=icono, default=primera)
+        primera = False
+        return p
+    if isinstance(pantallas, dict):
+        return {seccion: [pagina(*x) for x in lista] for seccion, lista in pantallas.items()}
+    return [pagina(*x) for x in pantallas]
 
 
 def acceso() -> None:
@@ -83,11 +111,7 @@ if usuario["rol"] not in PANTALLAS:
     st.error(f"El rol «{usuario['rol']}» no tiene pantallas asignadas. Inicia sesión de nuevo.")
     st.stop()
 
-pagina = st.navigation(
-    [st.Page(ruta, title=titulo, icon=icono, default=(i == 0))
-     for i, (ruta, titulo, icono) in enumerate(PANTALLAS[usuario["rol"]])],
-    position="sidebar",
-)
+pagina = st.navigation(paginas(PANTALLAS[usuario["rol"]]), position="sidebar")
 
 with st.sidebar:
     st.button("Cerrar sesión", icon=":material/logout:", on_click=cerrar_sesion, width="stretch")
