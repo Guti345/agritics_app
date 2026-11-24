@@ -1,0 +1,148 @@
+AGRITICS BY SOAGRO
+Guía de identidad visual e inventario de archivos · Versión de trabajo 1.0
+Noviembre de 2026 | Plataforma web para una finca familiar de Caldas
+
+1. NOMBRE, PROPÓSITO Y FIRMA
+
+Nombre del producto en la página, los reportes y el documento académico: Agritics.
+Escritura: A inicial y «tics» en minúscula. La denominación completa es «Agritics by Soagro». Se adopta Agritics para todas las piezas, incluida la descripción del proyecto que usa «Agritx».
+Descripción breve: «Mi finca en datos». Agritics reúne las labores del día, la cosecha de café y plátano, la lluvia, los movimientos de caja y los insumos. La familia puede volver a los registros que sustentan una cifra.
+Contexto: MVP de un Proyecto Empresarial de la Maestría en Business Analytics de la Universidad del Rosario. Tecnología: Streamlit, FastAPI y MongoDB. Las vistas de demostración con datos semilla de un año cafetero deben identificar esos datos como ejemplos.
+
+2. ESLOGAN Y TONO
+
+Eslogan propuesto: «Los datos de tu finca, aliados para crecer».
+La frase de Soagro, «Aliado, es aquel que te da herramientas para crecer», sitúa el valor en acompañar al productor. Agritics concreta la herramienta: los datos que la propia finca registra. «Aliados» y «crecer» conservan el vínculo verbal entre ambas marcas.
+Ubicación: debajo del nombre en el acceso, o en la portada de una presentación. En pantallas de trabajo, el espacio principal corresponde a la tarea del día.
+Voz: cercana a quien registra en campo, precisa con las cifras y sobria ante la junta. Preferir palabras que se oigan en la finca: lote, labor, recolección, jornal, insumo y caja. Un verbo y una acción por botón.
+Ejemplos: «Registrar lluvia», «Guardar recolección», «Consultar nómina». Tras confirmar el guardado: «Registro guardado». Si falta una cantidad: «Escribe cuántos kilos recogiste». Si falta una medición: «Sin registro de lluvia». Reservar «0 mm» para una medición explícita de cero.
+
+3. LOGO Y RELACIÓN CON SOAGRO
+
+La propuesta de Agritics combina el nombre en Montserrat Bold con una hoja ascendente, dividida en tres franjas. La silueta retoma la hoja del sistema visual de Soagro y los cortes recuerdan la separación entre lotes y entre observaciones. El nombre identifica la página incluso cuando la persona ve el símbolo por primera vez.
+Principal: logo de Agritics en verde oscuro sobre blanco o marfil. En verde oscuro, usar la variante con letras marfil. Para la pestaña del navegador, usar el ícono cuadrado. El SVG conserva las letras como trazados; se puede escalar sin instalar una fuente.
+Respaldo: en el acceso y en la portada del reporte, situar el logo actual de Soagro al pie o en un extremo secundario. Puede llevar la leyenda «Una herramienta de» en texto independiente. El logo madre conserva íntegros su símbolo, nombre, colores y proporciones. Elegir el original blanco para superficie blanca y el original oscuro para superficie #004846.
+Tamaños iniciales para web: Agritics de 160 a 240 px de ancho en encabezados; Soagro de 90 a 120 px, con aire alrededor. En celular, bajar el respaldo al pie si las marcas compiten con los campos. Dejar alrededor de Agritics un margen mínimo equivalente a la mitad de la altura de su «A». Para impresión o Word, usar el PNG transparente a 1050 px o importar el SVG.
+
+4. PALETA DIGITAL
+
+Valores de la guía base, muestreados en aplicaciones finales y PNG de Soagro. Los nombres de uso para interfaz se definen aquí.
+  #004846  Verde oscuro  | Títulos, cuerpo, acción principal, íconos y serie principal.
+  #009C48  Verde hoja    | Símbolo, trazos e ilustración.
+  #00C94B  Verde vivo    | Acentos pequeños y hojas. En un fondo vivo, texto verde oscuro.
+  #EBE2DD  Arena         | Divisiones suaves, fondos secundarios y bandas de tabla.
+  #FFF4E8  Marfil        | Fondo general y texto de botones oscuros.
+  #FFFFFF  Blanco        | Superficie auxiliar para formularios, tablas y logo madre claro.
+Botón principal: fondo #004846 y texto #FFF4E8. Campo editable: fondo blanco, texto y borde visible verde oscuro. Etiquetas y cantidades usan verde oscuro en superficies claras. Para alertas, combinar el ícono de alerta con un texto concreto, por ejemplo «Revisar existencias». Para comparar café y plátano, acompañar cada serie con su nombre, unidad y un segundo rasgo: punto y línea continua para café, rombo y línea discontinua para plátano. En barras, rotular directamente las categorías.
+
+5. TIPOGRAFÍA
+
+Familia: Montserrat. Respaldo del sistema: Arial, sans-serif.
+  Título de página       Bold 700       28 px en web; 24 px en móvil.
+  Indicador destacado   Bold 700       28–32 px; unidad al lado, p. ej., COP/kg.
+  Título de sección     SemiBold 600   20 px.
+  Campo, botón o filtro SemiBold 600   16 px.
+  Cuerpo y formularios  Regular 400    16 px; interlineado inicial de 1,5.
+  Fuente y metadatos    Regular 400    14 px; unidad y fecha siempre legibles.
+En reportes, alinear a la derecha las cifras de una columna y mantener la misma precisión. Usar «$» con COP identificado en el encabezado. Para costo por kilo, especificar el cultivo y el producto pesado, por ejemplo café cereza si esa es la base del registro.
+
+6. USO POR PANTALLA
+
+Acceso. Logo de Agritics, eslogan y campos de ingreso. Usar la ilustración panorámica en un bloque independiente. En celular mostrar primero los campos. Poner el respaldo de Soagro en el pie. El paisaje es una ilustración editorial inspirada en Caldas; carece de valor cartográfico o documental.
+Mayordomo / registro diario. Ofrecer «Registrar labor», «Registrar recolección» y «Registrar lluvia». Mostrar lote, fecha y unidad antes de guardar. Diferenciar café y plátano con sus íconos y nombres. Ubicar «Adjuntar foto» junto al registro correspondiente. Mantener el fondo del formulario liso.
+Administrador / semana en finca. Mostrar el periodo y la finca. Agrupar nómina, caja, insumos y alertas. En compras o pagos, mostrar concepto, fecha y valor en COP. Cada alerta debe nombrar el elemento que requiere atención. Usar la franja clara en la cabecera.
+Junta familiar / resultados. Encabezar con finca y periodo. Presentar producción (kg por producto), margen (indicar COP o %) y costo por kilo (COP/kg); indicar con qué periodo se compara cada cifra. Incluir fuente y fecha de corte. Reservar la franja oscura y la firma de Soagro para la portada del informe.
+Fotografía. En registros de lluvia usar la foto adjunta al evento. En reportes, acompañar fotos reales con fecha y lote cuando estén registrados. El patrón de hojas funciona en portadas, separadores o espacios laterales. Mantener tablas, gráficas y cifras sobre superficie lisa.
+Las vistas ilustran jerarquía visual. Los permisos efectivos de cada usuario se resuelven en la aplicación.
+
+7. ARCHIVOS ENTREGADOS Y SU USO
+
+Descomprimir Agritics_kit_visual.zip. Copiar la carpeta assets/ a la raíz del proyecto. Los nombres y extensiones siguientes son exactos. Los SVG son editables por formas. Los PNG y el WebP permiten incorporar las piezas directamente en una presentación o en la app.
+
+assets/marca/agritics_claro.svg
+    Logo principal vectorial para superficies claras.
+assets/marca/agritics_claro.png
+    Logo principal transparente para Streamlit, Word y diapositivas.
+assets/marca/agritics_oscuro.svg
+    Logo vectorial con letras marfil para superficies oscuras.
+assets/marca/agritics_oscuro.png
+    Versión transparente para un encabezado o reporte oscuro.
+assets/marca/simbolo_agritics.svg
+    Hoja segmentada independiente para espacios reducidos.
+assets/marca/icono_app.svg
+    Ícono cuadrado de la app, editable, sobre verde oscuro.
+assets/marca/icono_app.png
+    Ícono a 192 × 192 px para la pestaña del navegador.
+assets/soagro/logo_original_claro.png
+    PNG original entregado sobre blanco. Respaldo institucional.
+assets/soagro/logo_original_oscuro.png
+    PNG original entregado sobre verde oscuro. Portadas y pie.
+assets/soagro/patron_hojas_original.png
+    Patrón original de hojas con transparencia. Recurso secundario.
+assets/fondos/portada_cafetal.webp
+    Ilustración panorámica de laderas cafeteras y plátano. Acceso y presentación.
+assets/fondos/separador_hojas.svg
+    Línea arena y dos pares de hojas. Divisor entre secciones.
+assets/fondos/franja_tablero.svg
+    Cabecera marfil. Hojas a la derecha, espacio para título a la izquierda.
+assets/fondos/franja_reporte.svg
+    Cabecera verde oscuro. Añadir finca y periodo con texto marfil.
+assets/iconos/labores.svg
+    Herramienta de campo. Acción «Registrar labor».
+assets/iconos/cafe.svg
+    Cerezas de café. Selección de cultivo y registro de recolección.
+assets/iconos/platano.svg
+    Plátanos. Selección de cultivo y registro de recolección.
+assets/iconos/lluvia.svg
+    Nube con gotas. Registro de lluvia en milímetros.
+assets/iconos/nomina.svg
+    Persona y comprobante. Nómina y jornales.
+assets/iconos/caja.svg
+    Cartera. Ingresos, egresos y saldo.
+assets/iconos/insumos.svg
+    Caja de inventario. Existencias y movimientos de insumos.
+assets/iconos/alertas.svg
+    Triángulo con signo de atención. Alertas semanales.
+assets/iconos/reporte.svg
+    Hoja con barras. Informes de producción, margen y costo.
+assets/fuentes/Montserrat-Regular.ttf
+    Peso 400 para lectura y valores de formulario.
+assets/fuentes/Montserrat-SemiBold.ttf
+    Peso 600 para etiquetas, acciones y subtítulos.
+assets/fuentes/Montserrat-Bold.ttf
+    Peso 700 para títulos e indicadores.
+assets/estilos/paleta.css
+    Variables CSS con los cinco tonos de marca y blanco auxiliar.
+
+Agritics_muestra_visual.png
+    Lámina de referencia con las dos marcas, el eslogan, la ilustración, los íconos por perfil y la paleta.
+Agritics_guia_de_marca.txt
+    Esta guía. Se entrega también dentro del ZIP para que viaje junto con los recursos.
+
+8. REFERENCIA PARA STREAMLIT
+
+Colocar assets/ junto al archivo principal de la app. Resolver las rutas desde ese archivo. Ejemplo para el acceso:
+
+    from pathlib import Path
+    from PIL import Image
+    import streamlit as st
+
+    assets = Path(__file__).resolve().parent / "assets"
+    st.set_page_config(
+        page_title="Agritics",
+        page_icon=Image.open(assets / "marca" / "icono_app.png"),
+    )
+    st.image(str(assets / "marca" / "agritics_claro.png"), width=210)
+    st.write("Los datos de tu finca, aliados para crecer.")
+    st.image(str(assets / "fondos" / "portada_cafetal.webp"))
+
+Para el tema, estas son las claves de color que se pueden incorporar a .streamlit/config.toml:
+
+    [theme]
+    base = "light"
+    primaryColor = "#004846"
+    backgroundColor = "#FFF4E8"
+    secondaryBackgroundColor = "#FFFFFF"
+    textColor = "#004846"
+
+Los archivos TTF se entregan para su instalación o publicación desde la app. Copiarlos al proyecto por sí solo no activa la fuente. Configurar la familia Montserrat en el entorno que genere las pantallas o exporte los informes. El CSS contiene variables para componentes que carguen una hoja de estilos propia. Las franjas se entregan sin texto para que la finca, el periodo y el título se escriban como texto real.
