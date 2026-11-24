@@ -14,7 +14,7 @@ from .campos import (
     Texto,
     foto_obligatoria,
 )
-from .base import Entrada, SalidaCaptura
+from .base import Entrada, SalidaCaptura, modelo_parcial
 
 
 class AnalisisCalidad(Entrada):
@@ -84,3 +84,6 @@ class VentaCafeResponse(SalidaCaptura):
     numero_pedido: str = ""
     id_comprobante: str | None = None
     foto_ruta: str
+
+
+VentaCafeUpdate = modelo_parcial(VentaCafeCreate)

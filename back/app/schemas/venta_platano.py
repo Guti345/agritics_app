@@ -5,7 +5,7 @@ from pydantic import model_validator
 from .enums import Calidad
 from .tiempo import fmt_pesos
 from .campos import EnteroPositivo, Fecha, FechaOut, OidIn, OidOut, Positivo, Texto
-from .base import Entrada, SalidaCaptura
+from .base import Entrada, SalidaCaptura, modelo_parcial
 
 
 class VentaPlatanoCreate(Entrada):
@@ -35,3 +35,6 @@ class VentaPlatanoResponse(SalidaCaptura):
     precio_kg: float
     valor_total: float
     cosecha_id: OidOut | None = None
+
+
+VentaPlatanoUpdate = modelo_parcial(VentaPlatanoCreate)

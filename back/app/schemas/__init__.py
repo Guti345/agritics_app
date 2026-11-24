@@ -79,8 +79,8 @@ from .pool_semana import (
     PoolDesactivar,
     PoolTrabajadorResponse,
 )
-from .cosecha_platano import CosechaPlatanoCreate, CosechaPlatanoResponse
-from .venta_platano import VentaPlatanoCreate, VentaPlatanoResponse
+from .cosecha_platano import CosechaPlatanoCreate, CosechaPlatanoResponse, CosechaPlatanoUpdate
+from .venta_platano import VentaPlatanoCreate, VentaPlatanoResponse, VentaPlatanoUpdate
 from .venta_cafe import (
     AnalisisCalidad,
     Descuento,
@@ -88,12 +88,22 @@ from .venta_cafe import (
     DescuentoResponse,
     AnalisisCalidadResponse,
     VentaCafeResponse,
+    VentaCafeUpdate,
 )
-from .compra_insumo import CompraInsumoCreate, CompraInsumoResponse
-from .gasto import GastoCreate, GastoResponse
-from .caja import MovimientoCajaCreate, MovimientoCajaResponse
-from .lluvia import LluviaCreate, LluviaResponse
+from .compra_insumo import CompraInsumoCreate, CompraInsumoResponse, CompraInsumoUpdate
+from .gasto import GastoCreate, GastoResponse, GastoUpdate
+from .caja import (
+    MovimientoCajaCreate,
+    MovimientoCajaResponse,
+    MovimientoCajaUpdate,
+    ComponenteSaldo,
+    CajaSaldoResponse,
+)
+from .lluvia import LluviaCreate, LluviaResponse, LluviaUpdate, LluviaDiaResponse
 from .auditoria import AuditoriaResponse
+
+# ── Archivos ──
+from .uploads import FotoSubidaResponse
 
 __all__ = [
     # Infraestructura
@@ -116,13 +126,17 @@ __all__ = [
     "LaborDiariaUpdate", "LaborCompletar",
     "Preasignacion", "PoolSemanaCreate", "PreasignacionResponse", "PoolSemanaResponse",
     "PoolActivar", "PoolDesactivar", "PoolTrabajadorResponse",
-    "CosechaPlatanoCreate", "CosechaPlatanoResponse",
-    "VentaPlatanoCreate", "VentaPlatanoResponse",
+    "CosechaPlatanoCreate", "CosechaPlatanoResponse", "CosechaPlatanoUpdate",
+    "VentaPlatanoCreate", "VentaPlatanoResponse", "VentaPlatanoUpdate",
     "AnalisisCalidad", "Descuento", "VentaCafeCreate", "DescuentoResponse",
     "AnalisisCalidadResponse", "VentaCafeResponse",
-    "CompraInsumoCreate", "CompraInsumoResponse",
-    "GastoCreate", "GastoResponse",
-    "MovimientoCajaCreate", "MovimientoCajaResponse",
-    "LluviaCreate", "LluviaResponse",
+    "VentaCafeUpdate",
+    "CompraInsumoCreate", "CompraInsumoResponse", "CompraInsumoUpdate",
+    "GastoCreate", "GastoResponse", "GastoUpdate",
+    "MovimientoCajaCreate", "MovimientoCajaResponse", "MovimientoCajaUpdate", "ComponenteSaldo",
+    "CajaSaldoResponse",
+    "LluviaCreate", "LluviaResponse", "LluviaUpdate", "LluviaDiaResponse",
     "AuditoriaResponse",
+    # Archivos
+    "FotoSubidaResponse",
 ]

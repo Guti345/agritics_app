@@ -1,7 +1,7 @@
 """DTOs de compra de insumos."""
 
-from .campos import Fecha, FechaOut, OidIn, OidOut, Positivo
-from .base import Entrada, SalidaCaptura
+from .campos import Fecha, FechaOut, OidIn, OidOut, Positivo, foto_obligatoria
+from .base import Entrada, SalidaCaptura, modelo_parcial
 
 
 class CompraInsumoCreate(Entrada):
@@ -9,7 +9,7 @@ class CompraInsumoCreate(Entrada):
     insumo_id: OidIn
     cantidad: Positivo
     valor: Positivo
-    comprobante_ruta: str | None = None
+    comprobante_ruta: foto_obligatoria("Adjunta la foto del comprobante de la compra") = None
 
 
 class CompraInsumoResponse(SalidaCaptura):
@@ -18,3 +18,6 @@ class CompraInsumoResponse(SalidaCaptura):
     cantidad: float
     valor: float
     comprobante_ruta: str | None = None
+
+
+CompraInsumoUpdate = modelo_parcial(CompraInsumoCreate)

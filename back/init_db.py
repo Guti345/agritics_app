@@ -220,6 +220,13 @@ COLECCIONES[db.LABOR_DIARIA] = (
         ([("fecha", DESCENDING)], {}),
         ([("trabajador_id", ASCENDING), ("fecha", DESCENDING)], {}),
         ([("lote_id", ASCENDING), ("fecha", DESCENDING)], {}),
+        # Regla estrella también en la base: un trabajador no puede tener dos labores
+        # abiertas, ni por condición de carrera (dos capturas al mismo tiempo).
+        (
+            [("trabajador_id", ASCENDING)],
+            {"unique": True, "name": "unica_labor_abierta",
+             "partialFilterExpression": {"completada": False}},
+        ),
     ],
 )
 

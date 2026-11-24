@@ -1,5 +1,6 @@
 """Utilidades compartidas por los routers: ids, búsquedas, altas y correcciones auditadas."""
 
+from datetime import date, datetime, timezone
 from typing import Any, Callable
 
 from bson import ObjectId
@@ -61,6 +62,13 @@ def _como_entrada(v: Any) -> Any:
     return v
 
 
+def fusionar(doc: dict, create: type[Entrada], cambios: dict) -> Entrada:
+    """El documento como quedaría con los cambios, validado con el Create (422 si no)."""
+    base = {k: _como_entrada(doc[k]) for k in create.model_fields if k in doc}
+    fusion = {k: v for k, v in {**base, **cambios}.items() if v is not None}
+    return validar_o_422(create, fusion)
+
+
 async def corregir(
     db: AsyncIOMotorDatabase,
     coleccion: str,
@@ -76,9 +84,7 @@ async def corregir(
     """PATCH auditado. Fusiona `cambios` con el documento actual, revalida TODO con el
     Create (mismas reglas y mensajes que al crear), aplica `reglas` de negocio, guarda
     solo lo que cambió y deja una fila en auditoría por cada campo. Nada se borra."""
-    base = {k: _como_entrada(doc[k]) for k in create.model_fields if k in doc}
-    fusion = {k: v for k, v in {**base, **cambios}.items() if v is not None}
-    validado = validar_o_422(create, fusion)
+    validado = fusionar(doc, create, cambios)
     if reglas:
         reglas(validado)
     nuevo = validado.a_mongo()
@@ -122,3 +128,19 @@ def semana_de_query(semana: str) -> str:
         return _SEMANA_ISO.validate_python(semana)
     except ValidationError as e:
         raise RequestValidationError([{**err, "loc": ("query", "semana")} for err in e.errors()]) from None
+
+
+def _utc(d: date) -> datetime:
+    return datetime(d.year, d.month, d.day, tzinfo=timezone.utc)  # así se guardan las fechas de día
+
+
+def filtro_fechas(fecha: date | None, desde: date | None, hasta: date | None, campo: str = "fecha") -> dict:
+    """Filtro de Mongo para un día exacto o un rango (inclusive) sobre un campo de fecha de día."""
+    if fecha:
+        return {campo: _utc(fecha)}
+    rango = {}
+    if desde:
+        rango["$gte"] = _utc(desde)
+    if hasta:
+        rango["$lte"] = _utc(hasta)
+    return {campo: rango} if rango else {}

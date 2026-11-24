@@ -1,10 +1,12 @@
 """DTOs de movimientos de caja (aportes, retiros, ajustes: nunca entran al margen)."""
 
-from pydantic import Field, model_validator
+from datetime import date
+
+from pydantic import BaseModel, Field, model_validator
 
 from .enums import TipoMovimientoCaja
 from .campos import Fecha, FechaOut
-from .base import Entrada, SalidaCaptura
+from .base import Entrada, SalidaCaptura, modelo_parcial
 
 
 class MovimientoCajaCreate(Entrada):
@@ -28,3 +30,29 @@ class MovimientoCajaResponse(SalidaCaptura):
     tipo: TipoMovimientoCaja
     valor: float
     nota: str = ""
+
+
+MovimientoCajaUpdate = modelo_parcial(MovimientoCajaCreate)
+
+
+class ComponenteSaldo(BaseModel):
+    """Un componente del saldo: cuántos registros y cuánto suman (en pesos, siempre positivo)."""
+    registros: int
+    valor: float
+
+
+class CajaSaldoResponse(BaseModel):
+    """Saldo = ventas de café + ventas de plátano - gastos - compras de insumos
+    - nómina causada + movimientos de caja (aportes y ajustes suman, retiros restan)."""
+    desde: date | None = None
+    hasta: date
+    ventas_cafe: ComponenteSaldo
+    ventas_platano: ComponenteSaldo
+    gastos: ComponenteSaldo
+    gastos_por_categoria: dict[str, float]
+    compras_insumos: ComponenteSaldo
+    nomina_causada: ComponenteSaldo
+    movimientos_caja: ComponenteSaldo
+    movimientos_por_tipo: dict[str, float]
+    saldo: float
+    advertencias: list[str] = Field(default_factory=list)

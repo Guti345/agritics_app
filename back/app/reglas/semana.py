@@ -38,3 +38,12 @@ async def exigir_semana_abierta(db: AsyncIOMotorDatabase, fecha: date, rol: str)
     semana = semana_iso(fecha)
     if await semana_cerrada(db, semana):
         raise conflicto(f"La semana {semana} ya está cerrada; solo el administrador puede corregirla")
+
+
+async def exigir_semanas_abiertas_en_correccion(
+    db: AsyncIOMotorDatabase, fecha_vieja: date, fecha_nueva: date | None, rol: str
+) -> None:
+    """PATCH: revisa la semana de la fecha vieja y, si cambia, la de la nueva."""
+    await exigir_semana_abierta(db, fecha_vieja, rol)
+    if fecha_nueva and fecha_nueva != fecha_vieja:
+        await exigir_semana_abierta(db, fecha_nueva, rol)

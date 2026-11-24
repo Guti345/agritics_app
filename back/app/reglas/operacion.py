@@ -12,6 +12,10 @@ from back.app.reglas.semana import semana_iso
 from back.app.schemas import fmt_num
 from back.app.utils import buscar_o_404
 
+# Regla estrella. También es el 409 cuando el índice único parcial "unica_labor_abierta"
+# (init_db.py) rechaza una segunda labor abierta por condición de carrera.
+LABOR_ABIERTA = "Este trabajador ya tiene una labor abierta; complétala antes de abrir otra"
+
 
 def lunes_de(semana: str) -> date:
     """"2026-W48" -> lunes de esa semana (sirve para aplicar la regla de semana cerrada)."""
@@ -58,7 +62,7 @@ async def exigir_sin_labor_abierta(
         return
     dia = abierta["fecha"].date()
     if dia == fecha:
-        raise conflicto("Este trabajador ya tiene una labor abierta hoy; complétala antes de abrir otra")
+        raise conflicto(LABOR_ABIERTA)
     raise conflicto(f"Este trabajador tiene abierta una labor del {dia:%Y-%m-%d}; complétala antes de abrir otra")
 
 
@@ -84,3 +88,19 @@ async def descontar_insumo(db: AsyncIOMotorDatabase, insumo_id: str, cantidad: f
 async def devolver_insumo(db: AsyncIOMotorDatabase, insumo_id: str, cantidad: float) -> None:
     """Compensación si la labor no alcanzó a guardarse después de descontar el stock."""
     await db[INSUMOS].update_one({"_id": ObjectId(insumo_id)}, {"$inc": {"stock_actual": cantidad}})
+
+
+def exigir_cultivo(lote: dict, cultivo: str) -> None:
+    if cultivo not in lote.get("cultivos", []):
+        nombre = {"platano": "plátano", "cafe": "café"}.get(cultivo, cultivo)
+        raise conflicto(f"El lote '{lote['nombre']}' no tiene {nombre}")
+
+
+async def sumar_stock(db: AsyncIOMotorDatabase, insumo_id: str, cantidad: float) -> dict:
+    """Suma al stock en una sola operación ($inc). 404 si el insumo no existe."""
+    insumo = await db[INSUMOS].find_one_and_update(
+        {"_id": ObjectId(insumo_id)}, {"$inc": {"stock_actual": cantidad}}, return_document=ReturnDocument.AFTER
+    )
+    if insumo is None:
+        raise no_encontrado(f"No existe el insumo con id {insumo_id}")
+    return insumo

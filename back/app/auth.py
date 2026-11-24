@@ -66,3 +66,4 @@ CUALQUIERA = usuario_actual
 ADMIN = requiere_rol("administrador", "superusuario")
 ADMIN_O_MAYORDOMO = requiere_rol("administrador", "superusuario", "mayordomo")
 SUPERUSUARIO = requiere_rol("superusuario")
+FINANZAS_LECTURA = requiere_rol("administrador", "superusuario", "junta")

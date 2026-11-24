@@ -16,6 +16,7 @@ from back.app.reglas.operacion import (
     exigir_labor_activa,
     exigir_lote_activo,
     exigir_sin_labor_abierta,
+    LABOR_ABIERTA,
 )
 from back.app.reglas.semana import exigir_semana_abierta
 from back.app.schemas import (
@@ -61,7 +62,7 @@ async def abrir(
     if consumo:
         await descontar_insumo(db, consumo.insumo_id, consumo.cantidad)  # 409 si no alcanza: nada se escribe
     try:
-        guardado = await insertar(db[LABOR_DIARIA], doc, "Esta labor ya está registrada")
+        guardado = await insertar(db[LABOR_DIARIA], doc, LABOR_ABIERTA)  # índice unica_labor_abierta
     except Exception:
         if consumo:
             await devolver_insumo(db, consumo.insumo_id, consumo.cantidad)
@@ -159,6 +160,6 @@ async def corregir_labor_diaria(
             await exigir_sin_labor_abierta(db, a_oid(trabajador_id), fecha, excluir_id=doc["_id"])
 
     actualizado = await corregir(
-        db, LABOR_DIARIA, doc, LaborDiariaCreate, datos, yo, mensaje_duplicado="Esta labor ya está registrada"
+        db, LABOR_DIARIA, doc, LaborDiariaCreate, datos, yo, mensaje_duplicado=LABOR_ABIERTA
     )
     return LaborDiariaResponse.model_validate(actualizado)

@@ -2,7 +2,7 @@
 
 from .enums import Calidad
 from .campos import EnteroPositivo, Fecha, FechaOut, OidIn, OidOut, Positivo
-from .base import Entrada, SalidaCaptura
+from .base import Entrada, SalidaCaptura, modelo_parcial
 
 
 class CosechaPlatanoCreate(Entrada):
@@ -19,3 +19,6 @@ class CosechaPlatanoResponse(SalidaCaptura):
     kg: float
     racimos: int
     calidad: Calidad
+
+
+CosechaPlatanoUpdate = modelo_parcial(CosechaPlatanoCreate)

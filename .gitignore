@@ -433,3 +433,7 @@ venv/
 
 # Configuración local de Claude Code
 .claude/
+
+# Fotos que sube la app (la carpeta se conserva en el repo con .gitkeep)
+fotos/*
+!fotos/.gitkeep

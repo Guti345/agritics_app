@@ -21,15 +21,23 @@ from back.app.reglas.manejadores import registrar_manejadores
 from back.app.routers import (
     auditoria,
     auth,
+    caja,
+    compra_insumo,
+    cosecha_platano,
+    gasto,
     health,
     insumos,
     labor_diaria,
     labores,
+    lluvia,
     lotes,
     pool_semana,
     trabajadores,
     unidades,
+    uploads,
     usuarios,
+    venta_cafe,
+    venta_platano,
 )
 
 API_PREFIX = "/api/v1"
@@ -66,6 +74,7 @@ registrar_manejadores(app)
 # nada se borra; las correcciones son PATCH y quedan en auditoría.
 for modulo in (
     health, auth, usuarios, lotes, labores, trabajadores, insumos, unidades,
-    pool_semana, labor_diaria, auditoria,
+    pool_semana, labor_diaria, cosecha_platano, venta_platano, venta_cafe, compra_insumo,
+    gasto, caja, lluvia, uploads, auditoria,
 ):
     app.include_router(modulo.router, prefix=API_PREFIX)

@@ -4,7 +4,7 @@ from pydantic import model_validator
 
 from .enums import CategoriaGasto
 from .campos import Fecha, FechaOut, Positivo
-from .base import Entrada, SalidaCaptura
+from .base import Entrada, SalidaCaptura, modelo_parcial
 
 
 class GastoCreate(Entrada):
@@ -25,3 +25,6 @@ class GastoResponse(SalidaCaptura):
     categoria: CategoriaGasto
     descripcion: str | None = None
     valor: float
+
+
+GastoUpdate = modelo_parcial(GastoCreate)
