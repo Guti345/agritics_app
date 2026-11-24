@@ -1,7 +1,9 @@
 """Conexión a MongoDB local (motor, async).
 
-La base es "agritics" en mongodb://localhost:27017. Se puede cambiar con las
-variables de entorno AGRITICS_MONGO_URL y AGRITICS_DB_NAME (útil para pruebas).
+La conexión se configura con las variables MONGO_URI y MONGO_DB, que son
+obligatorias (no hay valores por defecto). Van en el entorno o en un archivo .env
+en la raíz del repo (copiar .env.example). El .env no se sube a git. Si una
+variable está en el entorno y también en el .env, gana la del entorno.
 
 Recordatorio de la regla transversal: Mongo es la SEGUNDA línea de defensa
 (validadores $jsonSchema e índices únicos). Toda regla de negocio se valida antes,
@@ -9,15 +11,32 @@ en la capa de DTOs/reglas, y falla con HTTPException y mensaje en español.
 """
 
 import os
+from pathlib import Path
 
+from dotenv import load_dotenv
 from motor.motor_asyncio import (
     AsyncIOMotorClient,
     AsyncIOMotorCollection,
     AsyncIOMotorDatabase,
 )
 
-MONGO_URL = os.getenv("AGRITICS_MONGO_URL", "mongodb://localhost:27017")
-DB_NAME = os.getenv("AGRITICS_DB_NAME", "agritics")
+# .env de la raíz del repo, sin importar desde qué carpeta se lance uvicorn.
+load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=False)
+
+
+
+def _variable_obligatoria(nombre: str) -> str:
+    valor = os.getenv(nombre, "").strip()
+    if not valor:
+        raise RuntimeError(
+            f"Falta la variable {nombre}. Defínala en el archivo .env de la raíz del "
+            f"repo (vea .env.example) o en el entorno antes de arrancar la API."
+        )
+    return valor
+
+
+MONGO_URI = _variable_obligatoria("MONGO_URI")
+MONGO_DB = _variable_obligatoria("MONGO_DB")
 
 # --- Nombres de colecciones -------------------------------------------------
 # Catálogos
@@ -55,7 +74,7 @@ def get_client() -> AsyncIOMotorClient:
     global _client
     if _client is None:
         _client = AsyncIOMotorClient(
-            MONGO_URL,
+            MONGO_URI,
             serverSelectionTimeoutMS=3000,  # si Mongo está apagado, fallar rápido
             tz_aware=True,
         )
@@ -65,7 +84,7 @@ def get_client() -> AsyncIOMotorClient:
 def get_db() -> AsyncIOMotorDatabase:
     """Base de datos "agritics". Sirve también como dependencia de FastAPI:
     `db: AsyncIOMotorDatabase = Depends(get_db)`."""
-    return get_client()[DB_NAME]
+    return get_client()[MONGO_DB]
 
 
 def coleccion(nombre: str) -> AsyncIOMotorCollection:

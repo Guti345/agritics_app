@@ -27,12 +27,14 @@ log = logging.getLogger("uvicorn.error")  # sale en la consola de uvicorn
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    # Solo el host: la URI puede traer usuario y contraseña y no debe ir al log.
+    host = db.MONGO_URI.rsplit("@", 1)[-1].split("://", 1)[-1].split("/", 1)[0]
     if await db.ping():
-        log.info("MongoDB conectado: %s / base '%s'", db.MONGO_URL, db.DB_NAME)
+        log.info("MongoDB conectado: %s / base '%s'", host, db.MONGO_DB)
     else:
         log.warning(
             "MongoDB no responde en %s. La API arranca, pero las operaciones con datos "
-            "fallarán hasta que Mongo esté encendido.", db.MONGO_URL,
+            "fallarán hasta que Mongo esté encendido.", host,
         )
     yield
     db.close_client()
