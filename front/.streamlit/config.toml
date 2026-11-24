@@ -27,6 +27,5 @@ weight = 700
 enableStaticServing = true
 
 [client]
-# El menú lo arma app.py con st.navigation según el rol: nunca el listado automático de pages/.
-showSidebarNavigation = false
+# El menú lo arma app.py con st.navigation según el rol (con st.navigation, pages/ no se lista solo).
 toolbarMode = "minimal"

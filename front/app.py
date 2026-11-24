@@ -14,12 +14,18 @@ st.set_page_config(page_title="Agritics", page_icon=Image.open(ui.ICONO_APP), la
 ui.estilos()
 
 # Pantallas por rol; la primera es la inicial. Las rutas son relativas a este archivo.
+CAMPO = [
+    ("pages/captura.py", "Captura rápida", ":material/edit_note:"),
+    ("pages/calendario.py", "Calendario de asignaciones", ":material/calendar_month:"),
+    ("pages/pool.py", "Pool de trabajadores", ":material/groups:"),
+    ("pages/cronograma.py", "Cronograma de la finca", ":material/view_week:"),
+]
 PANTALLAS = {
-    "mayordomo": [
-        ("pages/captura.py", "Captura rápida", ":material/edit_note:"),
-    ],
+    "mayordomo": CAMPO,
+    # El administrador también puede escribir lo de campo (la API lo deja: ADMIN_O_MAYORDOMO).
     "administrador": [
         ("pages/tablero_semana.py", "Tablero de la semana", ":material/calendar_view_week:"),
+        *CAMPO,
     ],
     "junta": [
         ("pages/tablero_kpis.py", "Tablero de KPIs", ":material/monitoring:"),

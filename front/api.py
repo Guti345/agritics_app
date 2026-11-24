@@ -12,7 +12,9 @@ from datetime import date, datetime
 import requests
 import streamlit as st
 
-BASE = os.environ.get("AGRITICS_API", "http://localhost:8000/api/v1").rstrip("/")
+# 127.0.0.1 y no "localhost": en Windows "localhost" prueba primero IPv6 (::1), donde uvicorn no
+# escucha, y cada llamada se demoraba ~2 s antes de caer a IPv4.
+BASE = os.environ.get("AGRITICS_API", "http://127.0.0.1:8000/api/v1").rstrip("/")
 ESPERA = 20  # segundos
 
 SIN_CONEXION = "No hay conexión con la API de Agritics. Revisa que el servidor esté encendido."
@@ -92,24 +94,32 @@ def _usuario() -> str:
     return st.session_state["usuario"]["usuario"]
 
 
+def lista(ruta: str, **params) -> list[dict]:
+    """GET de un catálogo o del pool, cacheado un minuto (se limpia con refrescar_listas)."""
+    return _catalogo(ruta, _usuario(), tuple(sorted((k, str(v)) for k, v in params.items() if v is not None)))
+
+
+def por_id(ruta: str, **params) -> dict[str, dict]:
+    """{id: documento} del catálogo, para poner nombres a los id que devuelve la API."""
+    return {d["id"]: d for d in lista(ruta, **params)}
+
+
 def opciones_lotes(cultivo: str | None = None) -> dict[str, str]:
     """Lotes en estado activo (opcionalmente de un cultivo)."""
-    params = (("estado", "activo"),) + ((("cultivo", cultivo),) if cultivo else ())
-    return {l["nombre"]: l["id"] for l in _catalogo("/lotes", _usuario(), params)}
+    return {l["nombre"]: l["id"] for l in lista("/lotes", estado="activo", cultivo=cultivo)}
 
 
 def opciones_labores(cultivo: str | None = None) -> dict[str, str]:
     """Labores activas (opcionalmente de un cultivo)."""
-    return {l["nombre"]: l["id"] for l in _catalogo("/labores", _usuario())
+    return {l["nombre"]: l["id"] for l in lista("/labores")
             if l["activa"] and (cultivo is None or cultivo in l["cultivos"])}
 
 
 def opciones_trabajadores(semana: str | None = None) -> dict[str, str]:
     """Trabajadores activos = los del pool de la semana (sin `semana`, la semana en curso)."""
-    params = (("activo", "true"),) + ((("semana", semana),) if semana else ())
-    return {p["trabajador_nombre"]: p["trabajador_id"] for p in _catalogo("/pool", _usuario(), params)}
+    return {p["trabajador_nombre"]: p["trabajador_id"] for p in lista("/pool", activo="true", semana=semana)}
 
 
 def refrescar_listas() -> None:
-    """Después de crear un lote, labor o mover el pool, para que las listas lo muestren ya."""
+    """Después de crear un trabajador o labor, o de mover el pool, para que las listas lo muestren ya."""
     _catalogo.clear()
