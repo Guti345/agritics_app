@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from back.app.auth import ADMIN_O_MAYORDOMO, CUALQUIERA
+from back.app.reglas.mensajes import TRABAJADOR_REPETIDO
 from back.app.database import TRABAJADORES, get_db
 from back.app.schemas import TrabajadorCreate, TrabajadorResponse, TrabajadorUpdate
 from back.app.utils import buscar_o_404, campos_captura, corregir, insertar
@@ -12,7 +13,7 @@ router = APIRouter(prefix="/trabajadores", tags=["Trabajadores"])
 
 # El documento puede ir vacío (varios trabajadores sin documento). Si viene y ya existe,
 # lo frena el índice único parcial de Mongo y aquí se traduce a 409 en español.
-DOCUMENTO_REPETIDO = "Ya hay un trabajador con ese documento"
+DOCUMENTO_REPETIDO = TRABAJADOR_REPETIDO
 
 
 @router.get("", response_model=list[TrabajadorResponse], summary="Listar trabajadores")

@@ -14,6 +14,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from back.app.database import CIERRES
 from back.app.reglas.auditoria import registrar_correccion
 from back.app.reglas.errores import conflicto
+from back.app.reglas.mensajes import periodo_cerrado
 
 
 def semana_iso(fecha: date) -> str:
@@ -45,10 +46,7 @@ async def exigir_periodo_abierto(db: AsyncIOMotorDatabase, fecha: date, rol: str
     if corte is None:
         return None
     if rol != "administrador":
-        raise conflicto(
-            f"Esa fecha ya quedó dentro del corte {corte['corte']} de la semana {corte['semana']}; "
-            "solo el administrador puede corregirla"
-        )
+        raise conflicto(periodo_cerrado(corte['corte'], corte['semana']))
     return corte
 
 

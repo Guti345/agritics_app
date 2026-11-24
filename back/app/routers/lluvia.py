@@ -6,6 +6,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from back.app.auth import ADMIN_O_MAYORDOMO, CUALQUIERA
 from back.app.database import LLUVIA, get_db
 from back.app.reglas.errores import conflicto
+from back.app.reglas.mensajes import lectura_lluvia_repetida
 from back.app.reglas.fotos import exigir_foto
 from back.app.reglas.semana import (
     auditar_escritura_en_periodo_cerrado,
@@ -49,7 +50,7 @@ async def _exigir_cupo_del_dia(db: AsyncIOMotorDatabase, momento: datetime, mm: 
     lecturas = await db[LLUVIA].find(filtro, {"fecha_hora": 1, "mm": 1}).to_list(None)
     hora = momento.astimezone(BOGOTA)
     if any(l["fecha_hora"] == hora for l in lecturas):
-        raise conflicto(f"Ya hay una lectura de lluvia a las {hora:%H:%M} del {dia:%Y-%m-%d}")
+        raise conflicto(lectura_lluvia_repetida(hora, dia))
     if len(lecturas) >= MAX_LECTURAS_DIA:
         raise conflicto(f"Ya hay {len(lecturas)} lecturas de lluvia el {dia:%Y-%m-%d}: el máximo es {MAX_LECTURAS_DIA} por día")
     total = sum(l["mm"] for l in lecturas) + mm
@@ -102,7 +103,7 @@ async def crear(datos: LluviaCreate, db: AsyncIOMotorDatabase = Depends(get_db),
     corte = await exigir_periodo_abierto(db, _dia(datos.fecha_hora), yo["rol"])
     await _exigir_cupo_del_dia(db, datos.fecha_hora, datos.mm)
     doc = {**datos.a_mongo(), **campos_captura(yo)}
-    guardado = await insertar(db[LLUVIA], doc, "Ya hay una lectura de lluvia a esa hora")
+    guardado = await insertar(db[LLUVIA], doc, lectura_lluvia_repetida(datos.fecha_hora.astimezone(BOGOTA), _dia(datos.fecha_hora)))
     await auditar_escritura_en_periodo_cerrado(db, corte, yo, LLUVIA, guardado["_id"])
     return LluviaResponse.model_validate(guardado)
 
@@ -119,5 +120,8 @@ async def corregir_lectura(
         exigir_foto(datos["foto_ruta"])
     if "fecha_hora" in datos or "mm" in datos:
         await _exigir_cupo_del_dia(db, nueva.fecha_hora, nueva.mm, excluir_id=doc["_id"])
-    actualizado = await corregir(db, LLUVIA, doc, LluviaCreate, datos, yo, "Ya hay una lectura de lluvia a esa hora")
+    actualizado = await corregir(
+        db, LLUVIA, doc, LluviaCreate, datos, yo,
+        lectura_lluvia_repetida(nueva.fecha_hora.astimezone(BOGOTA), _dia(nueva.fecha_hora)),
+    )
     return LluviaResponse.model_validate(actualizado)

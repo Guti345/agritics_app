@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from back.app.auth import ADMIN, FINANZAS_LECTURA
+from back.app.reglas.mensajes import RECIBO_REPETIDO
 from back.app.database import VENTA_CAFE, get_db
 from back.app.reglas.catalogos import exigir_nombre_libre
 from back.app.reglas.fotos import exigir_foto
@@ -16,10 +17,6 @@ from back.app.schemas import TipoProductoCafe, VentaCafeCreate, VentaCafeRespons
 from back.app.utils import buscar_o_404, campos_captura, corregir, filtro_fechas, insertar
 
 router = APIRouter(prefix="/ventas-cafe", tags=["Venta de café"])
-
-
-def _duplicado(comprobante: str) -> str:
-    return f"Ya hay un recibo registrado con el comprobante '{comprobante}'"
 
 
 @router.get("", response_model=list[VentaCafeResponse], summary="Listar ventas de café (recibos)")
@@ -50,10 +47,10 @@ async def crear(datos: VentaCafeCreate, db: AsyncIOMotorDatabase = Depends(get_d
     los porcentajes de calidad y la foto obligatoria los valida el DTO."""
     exigir_foto(datos.foto_ruta)
     if datos.id_comprobante:
-        await exigir_nombre_libre(db[VENTA_CAFE], "id_comprobante", datos.id_comprobante, _duplicado(datos.id_comprobante))
+        await exigir_nombre_libre(db[VENTA_CAFE], "id_comprobante", datos.id_comprobante, RECIBO_REPETIDO)
     corte = await exigir_periodo_abierto(db, datos.fecha, yo["rol"])
     doc = {**datos.a_mongo(), **campos_captura(yo)}
-    guardado = await insertar(db[VENTA_CAFE], doc, _duplicado(datos.id_comprobante or ""))
+    guardado = await insertar(db[VENTA_CAFE], doc, RECIBO_REPETIDO)
     await auditar_escritura_en_periodo_cerrado(db, corte, yo, VENTA_CAFE, guardado["_id"])
     return VentaCafeResponse.model_validate(guardado)
 
@@ -69,9 +66,9 @@ async def corregir_venta(
         exigir_foto(datos["foto_ruta"])
     if datos.get("id_comprobante"):
         await exigir_nombre_libre(
-            db[VENTA_CAFE], "id_comprobante", datos["id_comprobante"], _duplicado(datos["id_comprobante"]), doc["_id"]
+            db[VENTA_CAFE], "id_comprobante", datos["id_comprobante"], RECIBO_REPETIDO, doc["_id"]
         )
     actualizado = await corregir(
-        db, VENTA_CAFE, doc, VentaCafeCreate, datos, yo, _duplicado(datos.get("id_comprobante", ""))
+        db, VENTA_CAFE, doc, VentaCafeCreate, datos, yo, RECIBO_REPETIDO
     )
     return VentaCafeResponse.model_validate(actualizado)

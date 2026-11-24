@@ -11,13 +11,23 @@ from back.app.reglas.semana import semana_cortada_completa, semana_iso
 from back.app.schemas import (
     PoolActivar,
     PoolDesactivar,
+    PoolPreasignacionUpdate,
     PoolSemanaCreate,
     PoolSemanaResponse,
     PoolTrabajadorResponse,
     ahora,
     hoy,
 )
-from back.app.utils import a_oid, buscar_o_404, campos_captura, insertar, semana_de_query, validar_o_422
+from back.app.utils import (
+    a_oid,
+    buscar_o_404,
+    campos_captura,
+    corregir,
+    fusionar,
+    insertar,
+    semana_de_query,
+    validar_o_422,
+)
 
 router = APIRouter(prefix="/pool", tags=["Pool de la semana"])
 
@@ -120,3 +130,26 @@ async def listar(
         {"$sort": {"trabajador_nombre": 1}},
     ]).to_list(None)
     return [PoolTrabajadorResponse.model_validate(f) for f in filas]
+
+
+@router.patch("/{id}", response_model=PoolSemanaResponse,
+              summary="Cambiar la preasignación de un trabajador activo (queda en auditoría)")
+async def cambiar_preasignacion(
+    id: str,
+    datos: PoolPreasignacionUpdate,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    yo: dict = Depends(ADMIN_O_MAYORDOMO),
+):
+    """Reemplaza la lista COMPLETA de preasignaciones (lista vacía = quitarlas). Solo eso:
+    trabajador, semana, activo y fecha de activación no se tocan por aquí."""
+    doc = await buscar_o_404(db[POOL_SEMANA], id, "el registro del pool")
+    if not doc["activo"]:
+        raise conflicto(f"Este trabajador no está activo en la semana {doc['semana']}")
+    await _exigir_semana_no_cortada(db, doc["semana"], yo["rol"])
+    cambios = {"preasignacion": datos.model_dump()["preasignacion"]}
+    fusionar(doc, PoolSemanaCreate, cambios)  # días dentro de la semana: la regla del Create (422)
+    for p in datos.preasignacion:
+        await exigir_lote_activo(db, p.lote_id)
+        await exigir_labor_activa(db, p.labor_id)
+    actualizado = await corregir(db, POOL_SEMANA, doc, PoolSemanaCreate, cambios, yo, YA_ACTIVO)
+    return PoolSemanaResponse.model_validate(actualizado)

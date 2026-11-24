@@ -79,6 +79,7 @@ from .pool_semana import (
     PoolActivar,
     PoolDesactivar,
     PoolTrabajadorResponse,
+    PoolPreasignacionUpdate,
 )
 from .cosecha_platano import CosechaPlatanoCreate, CosechaPlatanoResponse, CosechaPlatanoUpdate
 from .venta_platano import VentaPlatanoCreate, VentaPlatanoResponse, VentaPlatanoUpdate
@@ -121,6 +122,39 @@ from .cortes import (
     CortePreviewResponse,
 )
 
+# ── Reportes (solo lectura) ──
+from .reportes import (
+    ProduccionDia,
+    ReciboCafe,
+    VentasCafeSemana,
+    ProduccionLote,
+    ProduccionFinca,
+    PlatanoLoteSemana,
+    R1ProduccionResponse,
+    IngresosPeriodo,
+    GastosPeriodo,
+    CapitalPeriodo,
+    PeriodoFlujo,
+    LineaCaja,
+    R2FlujoCajaResponse,
+    LaborNomina,
+    AnticipoRecibido,
+    RendimientoTrabajador,
+    TrabajadorNomina,
+    R3NominaResponse,
+    AdopcionDigital,
+    KpiLote,
+    RoiSimple,
+    KpisResponse,
+    InsumoBajoUmbral,
+    AlertasResponse,
+    LaborPlaneada,
+    LaborReal,
+    LoteDelDia,
+    DiaCronograma,
+    CronogramaResponse,
+)
+
 # ── Archivos ──
 from .uploads import FotoSubidaResponse
 
@@ -144,7 +178,7 @@ __all__ = [
     "InsumoConsumido", "LaborDiariaCreate", "InsumoConsumidoResponse", "LaborDiariaResponse",
     "LaborDiariaUpdate", "LaborCompletar", "AnticipoLaborResponse",
     "Preasignacion", "PoolSemanaCreate", "PreasignacionResponse", "PoolSemanaResponse",
-    "PoolActivar", "PoolDesactivar", "PoolTrabajadorResponse",
+    "PoolActivar", "PoolDesactivar", "PoolTrabajadorResponse", "PoolPreasignacionUpdate",
     "CosechaPlatanoCreate", "CosechaPlatanoResponse", "CosechaPlatanoUpdate",
     "VentaPlatanoCreate", "VentaPlatanoResponse", "VentaPlatanoUpdate",
     "AnalisisCalidad", "Descuento", "VentaCafeCreate", "DescuentoResponse",
@@ -160,6 +194,14 @@ __all__ = [
     "PagoAnticipos", "FilaPagoCorte", "CorteResponse", "PeriodoAbierto", "LaborAbiertaPreview",
     "ContratoAbiertoPreview", "CorteHechoPreview", "TrabajadorPool", "ComponenteSemana", "CuadresSemana",
     "CortePreviewResponse",
+    # Reportes
+    "ProduccionDia", "ReciboCafe", "VentasCafeSemana", "ProduccionLote", "ProduccionFinca",
+    "PlatanoLoteSemana", "R1ProduccionResponse", "IngresosPeriodo", "GastosPeriodo",
+    "CapitalPeriodo", "PeriodoFlujo", "LineaCaja", "R2FlujoCajaResponse", "LaborNomina",
+    "AnticipoRecibido", "RendimientoTrabajador", "TrabajadorNomina", "R3NominaResponse",
+    "AdopcionDigital", "KpiLote", "RoiSimple", "KpisResponse", "InsumoBajoUmbral",
+    "AlertasResponse", "LaborPlaneada", "LaborReal", "LoteDelDia", "DiaCronograma",
+    "CronogramaResponse",
     # Archivos
     "FotoSubidaResponse",
 ]

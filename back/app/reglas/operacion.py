@@ -12,9 +12,9 @@ from back.app.reglas.semana import semana_iso
 from back.app.schemas import fmt_num
 from back.app.utils import buscar_o_404
 
-# Regla estrella. También es el 409 cuando el índice único parcial "unica_labor_abierta"
-# (init_db.py) rechaza una segunda labor abierta por condición de carrera.
-LABOR_ABIERTA = "Este trabajador ya tiene una labor abierta; complétala antes de abrir otra"
+# Regla estrella: el texto vive en reglas/mensajes.py (también lo usa la traducción del
+# DuplicateKeyError del índice "unica_labor_abierta"). Se reexporta aquí para los routers.
+from back.app.reglas.mensajes import LABOR_ABIERTA  # noqa: E402,F401
 
 
 def lunes_de(semana: str) -> date:
@@ -57,13 +57,8 @@ async def exigir_sin_labor_abierta(
     filtro = {"trabajador_id": trabajador_id, "completada": False}
     if excluir_id is not None:
         filtro["_id"] = {"$ne": excluir_id}
-    abierta = await db[LABOR_DIARIA].find_one(filtro, {"fecha": 1})
-    if abierta is None:
-        return
-    dia = abierta["fecha"].date()
-    if dia == fecha:
+    if await db[LABOR_DIARIA].find_one(filtro, {"_id": 1}) is not None:
         raise conflicto(LABOR_ABIERTA)
-    raise conflicto(f"Este trabajador tiene abierta una labor del {dia:%Y-%m-%d}; complétala antes de abrir otra")
 
 
 async def descontar_insumo(db: AsyncIOMotorDatabase, insumo_id: str, cantidad: float) -> dict:

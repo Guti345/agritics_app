@@ -2,16 +2,13 @@ from fastapi import APIRouter, Depends, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from back.app.auth import ADMIN, CUALQUIERA
+from back.app.reglas.mensajes import LOTE_REPETIDO
 from back.app.database import LOTES, get_db
 from back.app.reglas.catalogos import exigir_nombre_libre
 from back.app.schemas import Cultivo, EstadoLote, LoteCreate, LoteResponse, LoteUpdate
 from back.app.utils import buscar_o_404, campos_captura, corregir, insertar
 
 router = APIRouter(prefix="/lotes", tags=["Lotes"])
-
-
-def _duplicado(nombre: str) -> str:
-    return f"Ya existe un lote con el nombre '{nombre}'"
 
 
 @router.get("", response_model=list[LoteResponse], summary="Listar lotes")
@@ -37,9 +34,9 @@ async def ver(id: str, db: AsyncIOMotorDatabase = Depends(get_db), _: dict = Dep
 
 @router.post("", response_model=LoteResponse, status_code=status.HTTP_201_CREATED, summary="Crear lote")
 async def crear(datos: LoteCreate, db: AsyncIOMotorDatabase = Depends(get_db), yo: dict = Depends(ADMIN)):
-    await exigir_nombre_libre(db[LOTES], "nombre", datos.nombre, _duplicado(datos.nombre))
+    await exigir_nombre_libre(db[LOTES], "nombre", datos.nombre, LOTE_REPETIDO)
     doc = {**datos.a_mongo(), **campos_captura(yo)}
-    return LoteResponse.model_validate(await insertar(db[LOTES], doc, _duplicado(datos.nombre)))
+    return LoteResponse.model_validate(await insertar(db[LOTES], doc, LOTE_REPETIDO))
 
 
 @router.patch("/{id}", response_model=LoteResponse, summary="Corregir lote (queda en auditoría)")
@@ -49,6 +46,6 @@ async def corregir_lote(
     doc = await buscar_o_404(db[LOTES], id, "el lote")
     datos = cambios.model_dump(exclude_unset=True)
     if datos.get("nombre"):
-        await exigir_nombre_libre(db[LOTES], "nombre", datos["nombre"], _duplicado(datos["nombre"]), doc["_id"])
-    actualizado = await corregir(db, LOTES, doc, LoteCreate, datos, yo, _duplicado(datos.get("nombre", "")))
+        await exigir_nombre_libre(db[LOTES], "nombre", datos["nombre"], LOTE_REPETIDO, doc["_id"])
+    actualizado = await corregir(db, LOTES, doc, LoteCreate, datos, yo, LOTE_REPETIDO)
     return LoteResponse.model_validate(actualizado)

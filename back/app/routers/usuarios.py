@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from back.app.auth import SUPERUSUARIO, hashear_clave
+from back.app.reglas.mensajes import USUARIO_REPETIDO
 from back.app.database import USUARIOS, get_db
 from back.app.reglas.catalogos import exigir_nombre_libre
 from back.app.reglas.errores import conflicto
@@ -33,12 +34,11 @@ async def crear(
     db: AsyncIOMotorDatabase = Depends(get_db),
     yo: dict = Depends(SUPERUSUARIO),
 ):
-    mensaje = f"Ya existe el usuario '{datos.usuario}'"
-    await exigir_nombre_libre(db[USUARIOS], "usuario", datos.usuario, mensaje)
+    await exigir_nombre_libre(db[USUARIOS], "usuario", datos.usuario, USUARIO_REPETIDO)
     doc = datos.a_mongo()
     doc["clave"] = hashear_clave(datos.clave)  # nunca se guarda la clave en claro
     doc.update(campos_captura(yo))
-    return UsuarioResponse.model_validate(await insertar(db[USUARIOS], doc, mensaje))
+    return UsuarioResponse.model_validate(await insertar(db[USUARIOS], doc, USUARIO_REPETIDO))
 
 
 @router.patch("/{id}", response_model=UsuarioResponse, summary="Activar/inactivar o cambiar la clave")
@@ -55,7 +55,7 @@ async def corregir_usuario(
     transformar = (lambda nuevo: {**nuevo, "clave": hashear_clave(nuevo["clave"])}) if "clave" in datos else None
     actualizado = await corregir(
         db, USUARIOS, doc, UsuarioCreate, datos, yo,
-        mensaje_duplicado=f"Ya existe el usuario '{doc['usuario']}'",
+        mensaje_duplicado=USUARIO_REPETIDO,
         transformar=transformar, ocultar=("clave",),
     )
     return UsuarioResponse.model_validate(actualizado)

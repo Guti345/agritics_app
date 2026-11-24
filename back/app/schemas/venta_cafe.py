@@ -1,6 +1,8 @@
 """DTOs de venta de café (recibo de la Cooperativa, un solo documento)."""
 
-from pydantic import BaseModel, Field, model_validator
+from typing import Annotated
+
+from pydantic import AfterValidator, BaseModel, Field, model_validator
 
 from .enums import TipoProductoCafe
 from .tiempo import fmt_num
@@ -28,6 +30,17 @@ class Descuento(Entrada):
     valor: NoNegativo
 
 
+def _factor_rendimiento(v: float) -> float:
+    """Guarda contra errores de digitación (un 940 o un 9,4), no una regla de negocio:
+    un recibo real nunca sale de 60-160."""
+    if not 60 <= v <= 160:
+        raise ValueError("El factor de rendimiento típico está entre 88 y ~110; revisa el dato del recibo")
+    return v
+
+
+FactorRendimiento = Annotated[float, AfterValidator(_factor_rendimiento), Field(json_schema_extra={"minimum": 60, "maximum": 160})]
+
+
 class VentaCafeCreate(Entrada):
     fecha: Fecha
     almacen: Texto
@@ -38,7 +51,7 @@ class VentaCafeCreate(Entrada):
     kg_netos: Positivo
     kg_pergamino_equivalente: NoNegativo
     analisis_calidad: AnalisisCalidad
-    factor_rendimiento: Positivo
+    factor_rendimiento: FactorRendimiento
     precio_base: Positivo
     descuentos: list[Descuento] = Field(default_factory=list)
     valor_total: NoNegativo

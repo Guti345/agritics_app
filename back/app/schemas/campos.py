@@ -147,6 +147,10 @@ def _limpiar(v: Any) -> Any:
     if isinstance(v, ObjectId):
         return str(v)
     if isinstance(v, datetime):
+        utc = (v if v.tzinfo else v.replace(tzinfo=timezone.utc)).astimezone(timezone.utc)
+        # Convención: las fechas de día se guardan como datetime a las 00:00 UTC -> se muestran como fecha.
+        if (utc.hour, utc.minute, utc.second, utc.microsecond) == (0, 0, 0, 0):
+            return utc.date()
         return _a_hora_colombia(v)
     if isinstance(v, dict):
         return {k: _limpiar(x) for k, x in v.items()}

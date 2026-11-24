@@ -61,3 +61,11 @@ class PoolDesactivar(Entrada):
 class PoolTrabajadorResponse(PoolSemanaResponse):
     """Fila de la lista desplegable del mayordomo: el pool con el nombre del trabajador."""
     trabajador_nombre: str
+
+
+class PoolPreasignacionUpdate(Entrada):
+    """Cuerpo de PATCH /pool/{id}: SOLO la preasignación; la lista se reemplaza completa
+    (lista vacía = quitar la preasignación). trabajador_id, semana, activo y
+    fecha_activacion no se tocan por aquí (extra="forbid" los rechaza con 422). La regla
+    de días dentro de la semana es la de PoolSemanaCreate: el router valida con ese DTO."""
+    preasignacion: list[Preasignacion]

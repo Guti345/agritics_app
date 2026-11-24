@@ -205,3 +205,29 @@ async def pago_de_corte(
         t["total"] = t["jornal"]["valor"] + t["contrato"]["valor"] + t["anticipos"]["valor"]
         resultado.append(t)
     return sorted(resultado, key=lambda t: t["nombre"].lower()), ids_pagados
+
+
+async def nomina_por_dia(db: AsyncIOMotorDatabase, desde: date, hasta: date) -> dict[date, float]:
+    """La MISMA nómina causada de `nomina()` (mismas expresiones y reglas), repartida por día:
+    labores completadas en su fecha (valor pactado) y anticipos de contratos abiertos en el
+    día en que se pagaron (hora de Colombia). La suma sobre el rango = total de `nomina()`.
+    La usa el flujo de caja (detalle diario y periodos)."""
+    ini, fin = _inicio_dia_colombia(desde), _inicio_dia_colombia(hasta) + timedelta(days=1)
+    r = await db[LABOR_DIARIA].aggregate([{"$facet": {
+        "completadas": [
+            {"$match": {"completada": True, "fecha": {"$gte": _utc(desde), "$lte": _utc(hasta)}}},
+            {"$group": {"_id": {"$dateToString": {"format": "%Y-%m-%d", "date": "$fecha"}}, "valor": {"$sum": PACTADO}}},
+        ],
+        "anticipos": [
+            {"$match": {"completada": False, "forma_pago": "contrato", "anticipos.fecha": {"$gte": ini, "$lt": fin}}},
+            {"$unwind": "$anticipos"},
+            {"$match": {"anticipos.fecha": {"$gte": ini, "$lt": fin}}},
+            {"$group": {"_id": {"$dateToString": {"format": "%Y-%m-%d", "date": "$anticipos.fecha", "timezone": "-05:00"}},
+                        "valor": {"$sum": "$anticipos.valor"}}},
+        ],
+    }}]).to_list(1)
+    por_dia: dict[date, float] = {}
+    for fila in r[0]["completadas"] + r[0]["anticipos"]:
+        dia = date.fromisoformat(fila["_id"])
+        por_dia[dia] = por_dia.get(dia, 0) + fila["valor"]
+    return dict(sorted(por_dia.items()))
