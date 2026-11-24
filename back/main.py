@@ -23,8 +23,10 @@ from back.app.routers import (
     auth,
     health,
     insumos,
+    labor_diaria,
     labores,
     lotes,
+    pool_semana,
     trabajadores,
     unidades,
     usuarios,
@@ -62,5 +64,8 @@ registrar_manejadores(app)
 
 # Todos los routers se montan con el mismo prefijo. No hay DELETE en ningún router:
 # nada se borra; las correcciones son PATCH y quedan en auditoría.
-for modulo in (health, auth, usuarios, lotes, labores, trabajadores, insumos, unidades, auditoria):
+for modulo in (
+    health, auth, usuarios, lotes, labores, trabajadores, insumos, unidades,
+    pool_semana, labor_diaria, auditoria,
+):
     app.include_router(modulo.router, prefix=API_PREFIX)

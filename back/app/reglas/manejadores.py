@@ -59,8 +59,8 @@ _MENSAJES = {
     "datetime_from_date_parsing": "debe ser fecha y hora (AAAA-MM-DD HH:MM)",
     "time_type": "debe ser una hora (HH:MM)",
     "time_parsing": "debe ser una hora (HH:MM)",
-    "enum": "debe ser una de estas opciones: {expected}",
-    "literal_error": "debe ser una de estas opciones: {expected}",
+    "enum": "debe ser {expected}",
+    "literal_error": "debe ser {expected}",
     "extra_forbidden": "no es un campo permitido",
     "dict_type": "debe ser un objeto con campos",
     "model_type": "debe ser un objeto con campos",
@@ -102,6 +102,11 @@ def _mensaje_error(err: dict) -> str:
         k: (int(v) if isinstance(v, float) and v.is_integer() else v)  # 0.0 -> 0
         for k, v in (err.get("ctx") or {}).items()
     }
+    if tipo in ("enum", "literal_error") and isinstance(ctx.get("expected"), str):
+        # Pydantic: "'kg', 'racimos' or 'ninguna'" -> "'kg', 'racimos' o 'ninguna'"
+        antes, sep, ultimo = ctx["expected"].rpartition(" or ")
+        if sep:
+            ctx["expected"] = f"{antes} o {ultimo}"
     try:
         return f"{campo} " + plantilla.format(**ctx)
     except (KeyError, IndexError):

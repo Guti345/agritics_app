@@ -5,13 +5,13 @@ from typing import Any, Callable
 from bson import ObjectId
 from fastapi.exceptions import RequestValidationError
 from motor.motor_asyncio import AsyncIOMotorCollection, AsyncIOMotorDatabase
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, TypeAdapter, ValidationError
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 
 from back.app.reglas.auditoria import registrar_correccion
 from back.app.reglas.errores import conflicto, datos_invalidos, no_encontrado
-from back.app.schemas import Entrada, ahora
+from back.app.schemas import Entrada, SemanaISO, ahora
 
 
 def a_oid(id: str) -> ObjectId:
@@ -111,3 +111,14 @@ async def corregir(
         raise conflicto(mensaje_duplicado) from None
     await registrar_correccion(db, usuario["usuario"], coleccion, doc["_id"], diferencias, ocultar)
     return actualizado
+
+
+_SEMANA_ISO = TypeAdapter(SemanaISO)
+
+
+def semana_de_query(semana: str) -> str:
+    """Valida un parámetro ?semana= con la misma regla del DTO (422 en español si no)."""
+    try:
+        return _SEMANA_ISO.validate_python(semana)
+    except ValidationError as e:
+        raise RequestValidationError([{**err, "loc": ("query", "semana")} for err in e.errors()]) from None

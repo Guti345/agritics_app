@@ -4,7 +4,7 @@ from pydantic import BaseModel, model_validator
 
 from .enums import FormaPago, TipoMeta
 from .campos import Fecha, FechaHoraOut, FechaOut, Jornales, NoNegativo, OidIn, OidOut, Positivo
-from .base import Entrada, SalidaCaptura
+from .base import Entrada, SalidaCaptura, modelo_parcial
 
 
 class InsumoConsumido(Entrada):
@@ -51,3 +51,18 @@ class LaborDiariaResponse(SalidaCaptura):
     completada: bool
     insumo_consumido: InsumoConsumidoResponse | None = None
     fecha_cierre: FechaHoraOut | None = None
+
+
+# PATCH: se corrige todo menos `completada` (va por /completar) e `insumo_consumido`
+# (cambiar el consumo exige devolver/descontar stock: no se corrige con un PATCH).
+LaborDiariaUpdate = modelo_parcial(
+    LaborDiariaCreate,
+    ["fecha", "trabajador_id", "lote_id", "labor_id", "forma_pago", "tarifa", "tipo_meta", "jornales", "avance"],
+    "LaborDiariaUpdate",
+)
+
+
+class LaborCompletar(Entrada):
+    """Cuerpo de POST /labores-diarias/{id}/completar: los valores reales del día."""
+    avance: NoNegativo
+    jornales: Jornales

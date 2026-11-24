@@ -67,8 +67,18 @@ from .labor_diaria import (
     LaborDiariaCreate,
     InsumoConsumidoResponse,
     LaborDiariaResponse,
+    LaborDiariaUpdate,
+    LaborCompletar,
 )
-from .pool_semana import Preasignacion, PoolSemanaCreate, PreasignacionResponse, PoolSemanaResponse
+from .pool_semana import (
+    Preasignacion,
+    PoolSemanaCreate,
+    PreasignacionResponse,
+    PoolSemanaResponse,
+    PoolActivar,
+    PoolDesactivar,
+    PoolTrabajadorResponse,
+)
 from .cosecha_platano import CosechaPlatanoCreate, CosechaPlatanoResponse
 from .venta_platano import VentaPlatanoCreate, VentaPlatanoResponse
 from .venta_cafe import (
@@ -103,7 +113,9 @@ __all__ = [
     "UsuarioCreate", "UsuarioResponse", "UsuarioUpdate", "LoginIn",
     # Operación
     "InsumoConsumido", "LaborDiariaCreate", "InsumoConsumidoResponse", "LaborDiariaResponse",
+    "LaborDiariaUpdate", "LaborCompletar",
     "Preasignacion", "PoolSemanaCreate", "PreasignacionResponse", "PoolSemanaResponse",
+    "PoolActivar", "PoolDesactivar", "PoolTrabajadorResponse",
     "CosechaPlatanoCreate", "CosechaPlatanoResponse",
     "VentaPlatanoCreate", "VentaPlatanoResponse",
     "AnalisisCalidad", "Descuento", "VentaCafeCreate", "DescuentoResponse",

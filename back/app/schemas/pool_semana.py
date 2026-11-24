@@ -42,3 +42,22 @@ class PoolSemanaResponse(Salida):
     activo: bool
     preasignacion: list[PreasignacionResponse] = Field(default_factory=list)
     fecha_activacion: FechaHoraOut
+
+
+class PoolActivar(Entrada):
+    """Cuerpo de POST /pool/activar. La regla de días dentro de la semana es la de
+    PoolSemanaCreate: el router la aplica validando con ese DTO (no se duplica)."""
+    trabajador_id: OidIn
+    semana: SemanaISO
+    preasignacion: list[Preasignacion] = Field(default_factory=list)
+
+
+class PoolDesactivar(Entrada):
+    """Cuerpo de POST /pool/desactivar."""
+    trabajador_id: OidIn
+    semana: SemanaISO
+
+
+class PoolTrabajadorResponse(PoolSemanaResponse):
+    """Fila de la lista desplegable del mayordomo: el pool con el nombre del trabajador."""
+    trabajador_nombre: str
