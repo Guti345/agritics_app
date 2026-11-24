@@ -430,3 +430,6 @@ FodyWeavers.xsd
 venv/
 .env
 .pytest_cache/
+
+# Configuración local de Claude Code
+.claude/

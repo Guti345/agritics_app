@@ -18,7 +18,17 @@ from fastapi import FastAPI
 
 from back.app import database as db
 from back.app.reglas.manejadores import registrar_manejadores
-from back.app.routers import health
+from back.app.routers import (
+    auditoria,
+    auth,
+    health,
+    insumos,
+    labores,
+    lotes,
+    trabajadores,
+    unidades,
+    usuarios,
+)
 
 API_PREFIX = "/api/v1"
 
@@ -50,5 +60,7 @@ app = FastAPI(
 
 registrar_manejadores(app)
 
-# Todos los routers se montan con el mismo prefijo.
-app.include_router(health.router, prefix=API_PREFIX)
+# Todos los routers se montan con el mismo prefijo. No hay DELETE en ningún router:
+# nada se borra; las correcciones son PATCH y quedan en auditoría.
+for modulo in (health, auth, usuarios, lotes, labores, trabajadores, insumos, unidades, auditoria):
+    app.include_router(modulo.router, prefix=API_PREFIX)
