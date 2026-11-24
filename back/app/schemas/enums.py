@@ -64,3 +64,4 @@ class TipoProductoCafe(StrEnum):
 class Cultivo(StrEnum):
     cafe = "cafe"
     platano = "platano"
+    bosque = "bosque"

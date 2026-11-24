@@ -85,6 +85,7 @@ def documento(propiedades: dict, *, opcionales: tuple[str, ...] = (), **extra) -
 
 
 CULTIVOS = arreglo(enum("cafe", "platano"), min_items=1, unicos=True)
+CULTIVOS_LOTE = arreglo(enum("cafe", "platano", "bosque"), min_items=1, unicos=True)  # un lote puede ser bosque
 CALIDAD_PLATANO = enum("primera", "segunda")
 TIPO_META = enum("kilos", "horas", "completada")
 AUDIT_CAPTURA = {"registrado_por": TEXTO, "fecha_captura": FECHA}
@@ -114,7 +115,7 @@ COLECCIONES[db.LOTES] = (
     {"$jsonSchema": documento(
         {
             "nombre": TEXTO,
-            "cultivos": CULTIVOS,
+            "cultivos": CULTIVOS_LOTE,
             "variedad": TEXTO_LIBRE,
             "area_ha": POSITIVO,
             "poligono": GEOJSON,
