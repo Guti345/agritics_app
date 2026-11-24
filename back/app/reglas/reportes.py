@@ -200,7 +200,7 @@ async def lineas_caja(db: AsyncIOMotorDatabase, desde: date, hasta: date) -> lis
             en_rango,
             _proyectar("capital", "$tipo",
                        {"$cond": [{"$gt": [{"$strLenCP": {"$ifNull": ["$nota", ""]}}, 0]}, "$nota", "$tipo"]},
-                       {"$cond": [{"$eq": ["$tipo", "retiro"]}, menos("$valor"), "$valor"]}, 4)]}},
+                       {"$cond": [{"$eq": ["$tipo", "retiro"]}, menos("$valor"), "$valor"]}, 0)]}},  # capital primero: con el aporte se paga
     ]).to_list(None)
     for l in lineas:
         l["fecha"] = _dia(l["fecha"])
