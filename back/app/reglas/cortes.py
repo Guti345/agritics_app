@@ -3,6 +3,8 @@
 Un corte va desde el día siguiente al último corte de la semana (o el lunes) hasta
 `hasta`. Paga las labores completadas sin corte con fecha <= hasta (jornal: jornales x
 tarifa; contrato: pactado - anticipos) más los anticipos nuevos sobre contratos abiertos.
+Pago selectivo (`trabajador_ids`): solo las de esos trabajadores; las demás quedan sin corte
+y las paga un corte posterior (el filtro de pago no mira el `desde` del periodo).
 Las labores pagadas quedan marcadas con su corte; la nómina no se guarda: se recalcula.
 """
 
@@ -68,6 +70,23 @@ async def _validar_anticipos(db: AsyncIOMotorDatabase, anticipos) -> list[tuple[
     return nuevos
 
 
+async def _validar_seleccion(db: AsyncIOMotorDatabase, trabajador_ids: list[str] | None,
+                             anticipos: list[tuple[dict, float]]) -> list[ObjectId] | None:
+    """Pago selectivo: los trabajadores deben existir y los anticipos del corte ser de ellos."""
+    if trabajador_ids is None:
+        return None
+    ids = list(dict.fromkeys(ObjectId(t) for t in trabajador_ids))
+    existen = {t["_id"] async for t in db[TRABAJADORES].find({"_id": {"$in": ids}}, {"_id": 1})}
+    for t in ids:
+        if t not in existen:
+            raise no_encontrado(f"No existe el trabajador con id {t}")
+    for labor, _ in anticipos:
+        if labor["trabajador_id"] not in existen:
+            raise datos_invalidos("Hay un anticipo para un trabajador que no está en la selección de este corte: "
+                                  "agrégalo a la selección o quita ese anticipo")
+    return ids
+
+
 async def crear_corte(db: AsyncIOMotorDatabase, datos: CorteCreate, usuario: dict) -> dict:
     """Valida, calcula y registra el corte. Devuelve el documento del corte con su nómina."""
     semana = datos.semana
@@ -90,9 +109,10 @@ async def crear_corte(db: AsyncIOMotorDatabase, datos: CorteCreate, usuario: dic
             f"el siguiente corte va desde el {desde:%Y-%m-%d}"
         )
     nuevos = await _validar_anticipos(db, datos.anticipos)
+    seleccion = await _validar_seleccion(db, datos.trabajador_ids, nuevos)
 
     # c. La nómina del corte (antes de escribir nada).
-    filas, ids_pagados = await pago_de_corte(db, hasta=hasta, anticipos=nuevos)
+    filas, ids_pagados = await pago_de_corte(db, hasta=hasta, anticipos=nuevos, trabajador_ids=seleccion)
 
     # e. El documento del corte se inserta PRIMERO: el índice único (semana, corte) aparta
     #    el número; si otro corte de la misma semana se registró a la vez, no se escribe nada.

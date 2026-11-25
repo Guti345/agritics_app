@@ -16,10 +16,15 @@ class AnticipoCorteIn(Entrada):
 
 
 class CorteCreate(Entrada):
-    """Cuerpo de POST /cortes. `hasta` por defecto es hoy (o el domingo si la semana ya pasó)."""
+    """Cuerpo de POST /cortes. `hasta` por defecto es hoy (o el domingo si la semana ya pasó).
+
+    `trabajador_ids` (opcional): pago SELECTIVO. Si viene, el corte paga solo las labores
+    completadas sin corte de esos trabajadores (y sus anticipos solo pueden ser de ellos); las
+    de los demás quedan sin corte y las paga un corte posterior. Si no viene, paga a todos."""
     semana: SemanaISO
     hasta: date | None = None
     anticipos: list[AnticipoCorteIn] = Field(default_factory=list)
+    trabajador_ids: list[OidIn] | None = Field(default=None, min_length=1)
 
 
 class AnticipoCorteResponse(BaseModel):

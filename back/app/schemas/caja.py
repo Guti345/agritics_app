@@ -1,4 +1,6 @@
-"""DTOs de movimientos de caja (aportes, retiros, ajustes: nunca entran al margen)."""
+"""DTOs de movimientos de caja: aportes, retiros, ajustes, préstamos recibidos, abonos a
+deudas y pagos de intereses. NUNCA entran al margen (no son ingreso ni gasto operacional).
+No hay módulo de deudas ni saldos de deuda: el detalle (acreedor, plazo...) va en la nota."""
 
 from datetime import date
 
@@ -12,7 +14,9 @@ from .base import Entrada, SalidaCaptura, modelo_parcial
 class MovimientoCajaCreate(Entrada):
     fecha: Fecha
     tipo: TipoMovimientoCaja
-    valor: float = Field(description="Aporte y retiro: positivo (el tipo dice si entra o sale). Ajuste: puede ser negativo.")
+    valor: float = Field(description="Positivo en todos los tipos menos el ajuste (el tipo dice si la plata entra o "
+                                     "sale: entran aporte_capital y prestamo_recibido; salen retiro, abono_deuda y "
+                                     "pago_intereses). Ajuste: puede ser negativo.")
     nota: str = ""
 
     @model_validator(mode="after")
@@ -43,7 +47,8 @@ class ComponenteSaldo(BaseModel):
 
 class CajaSaldoResponse(BaseModel):
     """Saldo = ventas de café + ventas de plátano - gastos - compras de insumos
-    - nómina causada + movimientos de caja (aportes y ajustes suman, retiros restan)."""
+    - nómina causada + movimientos de caja (aportes, préstamos recibidos y ajustes suman;
+    retiros, abonos a deudas y pagos de intereses restan)."""
     desde: date | None = None
     hasta: date
     ventas_cafe: ComponenteSaldo

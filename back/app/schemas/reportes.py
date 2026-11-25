@@ -106,10 +106,15 @@ class GastosPeriodo(BaseModel):
 
 
 class CapitalPeriodo(BaseModel):
-    """Aportes, retiros y ajustes: en línea APARTE, nunca en el margen."""
+    """Capital (aportes, retiros, ajustes) y deuda (préstamos recibidos, abonos a deudas, pagos
+    de intereses): en línea APARTE, nunca en el margen. Los que salen van en positivo;
+    neto = aportes - retiros + ajustes + préstamos - abonos - intereses."""
     aportes: float = 0
     retiros: float = 0
     ajustes: float = 0
+    prestamos: float = 0
+    abonos_deuda: float = 0
+    intereses: float = 0
     neto: float = 0
 
 

@@ -24,6 +24,7 @@ from .enums import (
     EstadoLote,
     CategoriaGasto,
     TipoMovimientoCaja,
+    SALEN_DE_CAJA,
     UnidadAvance,
     TipoMeta,
     Rol,
@@ -160,7 +161,7 @@ from .uploads import FotoSubidaResponse
 
 __all__ = [
     # Infraestructura
-    "FormaPago", "Calidad", "EstadoLote", "CategoriaGasto", "TipoMovimientoCaja", "UnidadAvance",
+    "FormaPago", "Calidad", "EstadoLote", "CategoriaGasto", "TipoMovimientoCaja", "SALEN_DE_CAJA", "UnidadAvance",
     "TipoMeta", "Rol", "TipoProductoCafe", "Cultivo",
     "BOGOTA", "ahora", "hoy", "fmt_num", "fmt_pesos",
     "foto_obligatoria", "Texto", "Positivo", "NoNegativo", "EnteroPositivo", "EnteroNoNegativo",

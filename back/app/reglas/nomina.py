@@ -146,17 +146,22 @@ async def pago_de_corte(
     hasta: date | None = None,
     corte: tuple[str, int] | None = None,
     anticipos: list[tuple[dict, float]] = (),
+    trabajador_ids: list[ObjectId] | None = None,
 ) -> tuple[list[dict], list[ObjectId]]:
     """Filas de pago por trabajador y los ids de las labores que se pagan.
 
     - Corte nuevo / preview: `hasta` -> completadas SIN corte con fecha <= hasta.
     - Corte ya hecho (para recalcular): `corte=(semana, numero)` -> las marcadas con él.
     - `anticipos`: [(labor, valor)] nuevos de este corte; suman al pago.
+    - `trabajador_ids` (corte nuevo, pago selectivo): solo las labores de esos trabajadores;
+      las de los demás quedan sin corte para un corte posterior. None = todos.
     """
     if corte is not None:
         filtro = {"corte_semana": corte[0], "corte": corte[1]}
     else:
         filtro = {"completada": True, "corte": {"$exists": False}, "fecha": {"$lte": _utc(hasta)}}
+        if trabajador_ids is not None:
+            filtro["trabajador_id"] = {"$in": trabajador_ids}
     jornal, contrato = {"$eq": ["$forma_pago", "jornal"]}, {"$eq": ["$forma_pago", "contrato"]}
     filas = await db[LABOR_DIARIA].aggregate([
         {"$match": filtro},

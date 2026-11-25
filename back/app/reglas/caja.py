@@ -2,9 +2,10 @@
 
 saldo = ventas de café + ventas de plátano
         - gastos - compras de insumos - nómina causada (reglas/nomina.py)
-        + movimientos de caja (aporte_capital y ajuste con su signo suman; retiro resta)
+        + movimientos de caja (aporte_capital, prestamo_recibido y ajuste con su signo suman;
+          retiro, abono_deuda y pago_intereses restan)
 
-Los aportes de capital entran al flujo de caja pero NUNCA al margen (eso es de los reportes).
+Los movimientos de caja (capital y deuda) entran al flujo de caja pero NUNCA al margen.
 """
 
 from datetime import date
@@ -13,7 +14,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from back.app.database import COMPRA_INSUMO, GASTO, MOVIMIENTO_CAJA, VENTA_CAFE, VENTA_PLATANO
 from back.app.reglas.nomina import nomina
-from back.app.schemas import fmt_pesos, hoy
+from back.app.schemas import SALEN_DE_CAJA, fmt_pesos, hoy
 from back.app.utils import filtro_fechas
 
 _INICIO = date(1900, 1, 1)  # "desde siempre" para la nómina cuando no hay fecha inicial
@@ -39,7 +40,7 @@ async def calcular_saldo(db: AsyncIOMotorDatabase, desde: date | None = None, ha
     n_gastos, gastos, gastos_cat = await _sumar(db, GASTO, "valor", filtro, por="categoria")
     n_compras, compras, _ = await _sumar(db, COMPRA_INSUMO, "valor", filtro)
     n_mov, _, mov_tipo = await _sumar(db, MOVIMIENTO_CAJA, "valor", filtro, por="tipo")
-    movimientos = sum(-v if tipo == "retiro" else v for tipo, v in mov_tipo.items())
+    movimientos = sum(-v if tipo in SALEN_DE_CAJA else v for tipo, v in mov_tipo.items())
 
     filas_nomina = await nomina(db, desde or _INICIO, hasta)
     nomina_total = sum(t["total"] for t in filas_nomina)

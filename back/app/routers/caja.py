@@ -57,9 +57,11 @@ async def ver(id: str, db: AsyncIOMotorDatabase = Depends(get_db), _: dict = Dep
 
 
 @router.post("/movimientos", response_model=MovimientoCajaResponse, status_code=status.HTTP_201_CREATED,
-             summary="Registrar aporte de capital, retiro o ajuste")
+             summary="Registrar aporte, retiro, ajuste, préstamo recibido, abono a deuda o pago de intereses")
 async def crear(datos: MovimientoCajaCreate, db: AsyncIOMotorDatabase = Depends(get_db), yo: dict = Depends(ADMIN)):
-    """Las reglas de valor por tipo las valida el DTO. Entra al flujo de caja, nunca al margen."""
+    """Las reglas de valor por tipo las valida el DTO (positivo salvo el ajuste; el tipo da el
+    signo: entran aporte_capital y prestamo_recibido; salen retiro, abono_deuda y
+    pago_intereses). Entra al flujo de caja, nunca al margen. El detalle de una deuda va en la nota."""
     corte = await exigir_periodo_abierto(db, datos.fecha, yo["rol"])
     doc = {**datos.a_mongo(), **campos_captura(yo)}
     guardado = await insertar(db[MOVIMIENTO_CAJA], doc, "Este movimiento ya está registrado")

@@ -36,7 +36,7 @@ from back.app.reglas.cortes import preview
 from back.app.reglas.errores import datos_invalidos
 from back.app.reglas.nomina import ANTICIPOS_TOTAL, PACTADO, nomina, nomina_por_dia, rango_semana
 from back.app.reglas.semana import semana_iso
-from back.app.schemas import BOGOTA, fmt_num, hoy
+from back.app.schemas import BOGOTA, SALEN_DE_CAJA, fmt_num, hoy
 
 DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
 SEMANA_DE = lambda campo: {"$dateToString": {"format": "%G-W%V", "date": campo}}  # noqa: E731  ISO "2026-W48"
@@ -215,7 +215,8 @@ async def lineas_caja(db: AsyncIOMotorDatabase, desde: date, hasta: date) -> lis
             en_rango,
             _proyectar("capital", "$tipo",
                        {"$cond": [{"$gt": [{"$strLenCP": {"$ifNull": ["$nota", ""]}}, 0]}, "$nota", "$tipo"]},
-                       {"$cond": [{"$eq": ["$tipo", "retiro"]}, menos("$valor"), "$valor"]}, 0)]}},  # capital primero: con el aporte se paga
+                       {"$cond": [{"$in": ["$tipo", sorted(SALEN_DE_CAJA)]}, menos("$valor"), "$valor"]},
+                       0)]}},  # capital primero: con el aporte se paga
     ]).to_list(None)
     for l in lineas:
         l["fecha"] = _dia(l["fecha"])
@@ -230,7 +231,13 @@ def _periodo(clave: str, desde: date, hasta: date) -> dict:
             "ingresos": {"cafe": 0, "platano": 0, "total": 0},
             "gastos": {"nomina": 0, "nomina_registrada_como_gasto": 0, "insumos": 0, "servicios": 0,
                        "transporte": 0, "casa": 0, "otros": 0, "total": 0},
-            "capital": {"aportes": 0, "retiros": 0, "ajustes": 0, "neto": 0}, "margen": 0, "flujo_neto": 0}
+            "capital": {"aportes": 0, "retiros": 0, "ajustes": 0, "prestamos": 0, "abonos_deuda": 0, "intereses": 0,
+                        "neto": 0}, "margen": 0, "flujo_neto": 0}
+
+
+# Movimiento de caja -> campo del bloque de capital (los que salen se acumulan en positivo).
+CAMPO_CAPITAL = {"aporte_capital": "aportes", "retiro": "retiros", "ajuste": "ajustes",
+                 "prestamo_recibido": "prestamos", "abono_deuda": "abonos_deuda", "pago_intereses": "intereses"}
 
 
 def _acumular(p: dict, l: dict) -> None:
@@ -239,16 +246,15 @@ def _acumular(p: dict, l: dict) -> None:
     elif l["tipo"] == "egreso":
         p["gastos"][l["categoria"]] += -l["valor"]
     else:
-        clave = {"aporte_capital": "aportes", "retiro": "retiros", "ajuste": "ajustes"}[l["categoria"]]
-        p["capital"][clave] += -l["valor"] if clave == "retiros" else l["valor"]
+        p["capital"][CAMPO_CAPITAL[l["categoria"]]] += -l["valor"] if l["categoria"] in SALEN_DE_CAJA else l["valor"]
 
 
 def _cerrar(p: dict) -> dict:
     p["ingresos"]["total"] = p["ingresos"]["cafe"] + p["ingresos"]["platano"]
     p["gastos"]["total"] = sum(v for k, v in p["gastos"].items() if k != "total")
-    p["margen"] = p["ingresos"]["total"] - p["gastos"]["total"]          # sin aportes ni retiros
+    p["margen"] = p["ingresos"]["total"] - p["gastos"]["total"]          # sin capital ni deuda
     c = p["capital"]
-    c["neto"] = c["aportes"] - c["retiros"] + c["ajustes"]
+    c["neto"] = c["aportes"] - c["retiros"] + c["ajustes"] + c["prestamos"] - c["abonos_deuda"] - c["intereses"]
     p["flujo_neto"] = p["margen"] + c["neto"]
     return p
 

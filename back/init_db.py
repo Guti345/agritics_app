@@ -373,10 +373,11 @@ COLECCIONES[db.GASTO] = (
 )
 
 COLECCIONES[db.MOVIMIENTO_CAJA] = (
-    # Aportes de capital, retiros y ajustes: alimentan el flujo de caja, NUNCA el margen.
+    # Capital (aportes, retiros, ajustes) y deuda (préstamos recibidos, abonos, intereses):
+    # alimentan el flujo de caja, NUNCA el margen.
     {"$jsonSchema": documento({
         "fecha": FECHA,
-        "tipo": enum("aporte_capital", "retiro", "ajuste"),
+        "tipo": enum("aporte_capital", "retiro", "ajuste", "prestamo_recibido", "abono_deuda", "pago_intereses"),
         "valor": num(),
         "nota": TEXTO_LIBRE,
         **AUDIT_CAPTURA,

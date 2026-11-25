@@ -62,7 +62,8 @@ async def r2_flujo_caja(
     _: dict = Depends(FINANZAS_LECTURA),
 ):
     """Ingresos, gastos por categoría (nómina de reglas/nomina.py) y margen por semana, mes
-    y año; aportes, retiros y ajustes APARTE (nunca en el margen); detalle día a día con el
+    y año; capital y deuda (aportes, retiros, ajustes, préstamos, abonos, intereses) APARTE
+    (nunca en el margen); detalle día a día con el
     saldo de caja resultante. Sin fechas: del 1 de enero a hoy."""
     return R2FlujoCajaResponse.model_validate(await reportes.r2_flujo_caja(db, desde, hasta, detalle))
 

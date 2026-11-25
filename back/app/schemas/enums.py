@@ -29,9 +29,17 @@ class CategoriaGasto(StrEnum):
 
 
 class TipoMovimientoCaja(StrEnum):
+    """Movimientos de caja que NUNCA entran al margen (ni como ingreso ni como gasto)."""
     aporte_capital = "aporte_capital"
     retiro = "retiro"
     ajuste = "ajuste"
+    prestamo_recibido = "prestamo_recibido"   # entra plata a caja; NO es ingreso
+    abono_deuda = "abono_deuda"               # sale plata de caja; NO es gasto
+    pago_intereses = "pago_intereses"         # sale plata de caja; NO es gasto operacional
+
+
+# Movimientos de caja que SACAN plata (el valor se guarda positivo; el tipo da el signo).
+SALEN_DE_CAJA = frozenset({TipoMovimientoCaja.retiro, TipoMovimientoCaja.abono_deuda, TipoMovimientoCaja.pago_intereses})
 
 
 class UnidadAvance(StrEnum):

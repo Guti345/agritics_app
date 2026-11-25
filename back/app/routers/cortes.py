@@ -30,5 +30,8 @@ async def cortar(
     """Cierra el periodo desde el día siguiente al último corte de la semana (o el lunes)
     hasta `hasta` (por defecto hoy). Paga: jornal completadas sin corte + contrato
     completadas sin corte (pactado - anticipos) + anticipos nuevos sobre contratos
-    abiertos. La nómina no se guarda: va en la respuesta y es recalculable."""
+    abiertos. La nómina no se guarda: va en la respuesta y es recalculable.
+
+    Pago selectivo: con `trabajador_ids`, el corte paga solo a esos trabajadores; los demás
+    quedan pendientes (el preview los sigue mostrando) y los paga un corte posterior."""
     return CorteResponse.model_validate(await crear_corte(db, datos, yo))
