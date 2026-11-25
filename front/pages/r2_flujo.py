@@ -27,7 +27,7 @@ for texto in r2["advertencias"]:
     st.warning(texto, icon=":material/warning:")
 
 total = r2["total"]
-m1, m2, m3, m4 = st.columns(4)
+m1, m4, m2, m3 = st.columns(4)
 m1.metric("Saldo inicial", ui.pesos(r2["saldo_inicial"]), border=True)
 ingresos_rango = total["ingresos"]["total"]
 operativo = f"{ui.numero(100 * total['margen'] / ingresos_rango, 1)} %" if ingresos_rango else "—"   # margen / ingresos
