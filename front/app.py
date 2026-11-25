@@ -15,12 +15,11 @@ ui.estilos()
 
 # Pantallas por rol; la primera es la inicial. Las rutas son relativas a este archivo.
 # Un rol puede tener secciones ({sección: [pantallas]}) o una lista simple.
-# Campo del administrador (sus pantallas de siempre).
+# Campo del administrador. «Programación» es la misma página del mayordomo (Cronograma y Programar).
 CAMPO = [
     ("pages/captura.py", "Captura rápida", ":material/edit_note:"),
-    ("pages/calendario.py", "Calendario de asignaciones", ":material/calendar_month:"),
     ("pages/pool.py", "Pool de trabajadores", ":material/groups:"),
-    ("pages/cronograma.py", "Cronograma de la finca", ":material/view_week:"),
+    ("pages/programacion.py", "Programación", ":material/event_note:"),
 ]
 # Mayordomo: inicio con tarjetas y mapa, y sus tres vistas.
 MAYORDOMO = [

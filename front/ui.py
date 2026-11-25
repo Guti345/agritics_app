@@ -230,24 +230,12 @@ def encabezado(usuario: dict) -> None:
     st.image(str(SEPARADOR), width="stretch")
 
 
-def chip_plan(texto: str, cumplida: bool) -> str:
-    """Labor planeada (preasignación del pool): borde punteado; dice si ya se cumplió."""
-    estado = "planeada · cumplida ✓" if cumplida else "planeada · sin registro"
-    return f"<span class='ag-chip plan'>{escape(texto)}<small>{estado}</small></span>"
-
-
 def chip_real(texto: str, completada: bool, detalle: str = "") -> str:
     """Labor real (labor_diaria): abierta (borde vivo) o completada (sólida)."""
     estado = "completada" if completada else "abierta"
     extra = f" · {escape(detalle)}" if detalle else ""
     return (f"<span class='ag-chip real {estado}'>{escape(texto)}"
             f"<small>{estado}{extra}</small></span>")
-
-
-LEYENDA = ("<div class='ag-leyenda'>"
-           "<span class='ag-chip plan'>Planeada</span>"
-           "<span class='ag-chip real abierta'>Real abierta</span>"
-           "<span class='ag-chip real completada'>Real completada</span></div>")
 
 
 # ── envío de formularios ───────────────────────────────────────────────────────
