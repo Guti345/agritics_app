@@ -21,7 +21,7 @@ TARJETAS = [
 ]
 
 
-st.title(f"Hola, {st.session_state['usuario']['nombre']}")
+st.title("Inicio")
 for col, (clave, ruta, titulo, texto, icono, simbolo) in zip(st.columns(3), TARJETAS):
     with col:
         ui.tarjeta(clave, ruta, titulo, texto, icono, simbolo)

@@ -31,7 +31,7 @@ SECCIONES = [  # clave, primera pantalla de la sección, título, qué encuentra
      "Catálogos de la finca, trazabilidad y Excel", ENGRANAJE, ":material/settings:"),
 ]
 
-st.title(f"Hola, {st.session_state['usuario']['nombre']}")
+st.title("Inicio")
 st.caption("Tu menú tiene cinco secciones. Entra a cada una desde aquí o desde el menú de la izquierda.")
 filas = [SECCIONES[:3], SECCIONES[3:]]
 for fila in filas:

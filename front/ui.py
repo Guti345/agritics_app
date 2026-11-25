@@ -23,6 +23,7 @@ import api
 ASSETS = Path(__file__).resolve().parent / "assets"
 LOGO = ASSETS / "marca" / "agritics_claro.png"
 ICONO_APP = ASSETS / "marca" / "icono_app.png"
+SOAGRO = ASSETS / "soagro" / "logo_original_nbg.png"      # logo de Soagro sin fondo
 SEPARADOR = ASSETS / "fondos" / "separador_hojas.svg"
 
 BOGOTA = timezone(timedelta(hours=-5))   # misma convención que la API (UTC-5, sin horario de verano)
@@ -40,8 +41,7 @@ CSS = """
 <style>
 .ag-semana {text-align: right; font-weight: 600;}
 .ag-semana span {background: #EBE2DD; border-radius: 8px; padding: .35rem .8rem; white-space: nowrap;}
-.ag-usuario {line-height: 1.3;}
-.ag-usuario small {font-size: 14px; opacity: .85;}
+.ag-bienvenida {font-size: 1.6rem; font-weight: 700; line-height: 1.25; color: #004846;}
 /* calendario y cronograma: planeadas (borde punteado) vs. reales (abierta: borde vivo; completada: sólida) */
 .ag-scroll {overflow-x: auto;}
 table.ag-cal {border-collapse: separate; border-spacing: 0; width: 100%; background: #FFFFFF;
@@ -95,6 +95,14 @@ table.ag-cal th.fuera, table.ag-cal td.fuera {opacity: .45;}   /* día de la sem
   overflow: visible !important; text-overflow: clip !important; height: auto !important;}
 .ag-capital p {display: flex; justify-content: space-between; margin: .1rem 0; font-size: 13px;}
 .ag-capital div {font-size: 26px !important;}
+/* barra lateral: el pie («Una herramienta de» + Soagro) queda pegado al fondo. La columna de
+   la barra es flexible y el pie empuja con margin-top: auto (sin posiciones fijas). */
+[data-testid="stSidebarContent"] {display: flex; flex-direction: column;}
+[data-testid="stSidebarUserContent"] {flex: 1 0 auto; display: flex; flex-direction: column; padding-bottom: 1.5rem;}
+[data-testid="stSidebarUserContent"] > div,
+[data-testid="stSidebarUserContent"] > div > [data-testid="stVerticalBlock"] {flex: 1 0 auto; display: flex; flex-direction: column;}
+[data-testid="stLayoutWrapper"]:has(> .st-key-sidebar_pie) {margin-top: auto; padding-top: 1.5rem;}
+.st-key-sidebar_pie [data-testid="stElementToolbar"] {display: none;}
 .ag-cifra {background: #FFFFFF; border: 1px solid #EBE2DD; border-radius: 8px; padding: .8rem 1rem;}
 .ag-cifra div {font-size: 32px; font-weight: 700; line-height: 1.2;}
 .ag-cifra small {font-size: 14px; opacity: .85;}
@@ -298,11 +306,10 @@ def estilos() -> None:
 
 
 def encabezado(usuario: dict) -> None:
-    """Encabezado permanente: logo pequeño, usuario y rol, y la semana en curso."""
-    logo, persona, semana = st.columns([1.2, 2.3, 2], vertical_alignment="center")
-    logo.image(str(LOGO), width=160)
-    persona.html(f"<div class='ag-usuario'><b>{usuario['nombre']}</b><br>"
-                 f"<small>{ROLES.get(usuario['rol'], usuario['rol'])}</small></div>")
+    """Encabezado permanente: el saludo («Hola, <nombre>») y la semana en curso. El logo de
+    Agritics va arriba de la barra lateral (st.logo), así que aquí no se repite."""
+    saludo, semana = st.columns([3, 2], vertical_alignment="center")
+    saludo.html(f"<div class='ag-bienvenida'>Hola, {escape(usuario['nombre'])}</div>")
     semana.html(f"<div class='ag-semana'><span>{semana_en_curso()}</span></div>")
     st.image(str(SEPARADOR), width="stretch")
 

@@ -4,6 +4,8 @@ Sin iniciar sesión no se ve nada: la única página que existe es el acceso. Al
 cada rol recibe SOLO sus pantallas (st.navigation) y cae en su pantalla inicial.
 """
 
+from pathlib import Path
+
 import streamlit as st
 from PIL import Image
 
@@ -93,13 +95,23 @@ def paginas(pantallas):
     return [pagina(*x) for x in pantallas]
 
 
-def acceso() -> None:
-    """Pantalla de acceso: marca, eslogan, campos e ilustración; Soagro al pie."""
-    st.image(str(ui.LOGO), width=210)
-    st.subheader("Los datos de tu finca, aliados para crecer")
+IMAGEN_LOGIN = ui.ASSETS / "fondos" / "login_cafetal.jpg"          # ruta oficial: front/assets/fondos/
+IMAGEN_LOGIN_RESPALDO = ui.ASSETS / "fondos" / "portada_cafetal.webp"
 
+
+def imagen_login() -> Path:
+    """La ilustración del login (front/assets/fondos/login_cafetal.jpg); si no está, la de siempre."""
+    return IMAGEN_LOGIN if IMAGEN_LOGIN.exists() else IMAGEN_LOGIN_RESPALDO
+
+
+def acceso() -> None:
+    """Pantalla de acceso: marca, eslogan, campos y Soagro al pie a la izquierda; la ilustración
+    llena toda la columna derecha, de borde a borde y a toda la altura de la ventana."""
+    st.html(CSS_LOGIN)
     campos, ilustracion = st.columns([2, 3], gap="large")
-    with campos:
+    with campos.container(key="login_campos"):
+        st.image(str(ui.LOGO), width=210)
+        st.subheader("Los datos de tu finca, aliados para crecer")
         with st.form("acceso", border=True):        # clear_on_submit=False: lo digitado se queda
             usuario = st.text_input("Usuario", key="acceso_usuario", autocomplete="username")
             clave = st.text_input("Clave", type="password", key="acceso_clave",
@@ -115,13 +127,30 @@ def acceso() -> None:
                     st.error(e.detalle, icon=":material/error:")
                 else:
                     st.rerun()
-    with ilustracion:
-        st.image(str(ui.ASSETS / "fondos" / "portada_cafetal.webp"), width="stretch")
+        st.write("")
+        st.caption("Una herramienta de")
+        st.image(str(ui.SOAGRO), width=150)                    # logo de Soagro sin fondo
+    with ilustracion.container(key="login_imagen"):
+        st.image(str(imagen_login()), width="stretch")
 
-    st.write("")
-    pie, _ = st.columns([1, 5])
-    pie.caption("Una herramienta de")
-    pie.image(str(ui.ASSETS / "soagro" / "logo_original_oscuro.png"), width=110)
+
+# Solo en el acceso: sin el encabezado de Streamlit y sin márgenes arriba, a la derecha ni abajo,
+# para que la ilustración toque esos tres bordes de la ventana (recorta sin deformar: object-fit
+# cover). El formulario conserva su margen superior normal.
+CSS_LOGIN = """
+<style>
+[data-testid="stHeader"] {display: none;}
+[data-testid="stMain"], [data-testid="stAppViewContainer"] {padding-top: 0 !important;}
+[data-testid="stMainBlockContainer"] {padding-top: 0; padding-right: 0; padding-bottom: 0; max-width: 100%;}
+.st-key-login_campos {padding-top: 1.5rem;}
+.st-key-login_imagen, .st-key-login_imagen [data-testid="stImage"],
+.st-key-login_imagen [data-testid="stImageContainer"] {width: 100%; max-width: none;}
+.st-key-login_imagen img {display: block; width: 100% !important; max-width: none !important;
+  height: 100vh; object-fit: cover; object-position: center;
+  border-radius: 0 !important; box-shadow: none !important; border: none !important;}
+.st-key-login_imagen [data-testid="stElementToolbar"], .st-key-login_imagen button {display: none !important;}
+</style>
+"""
 
 
 def cerrar_sesion() -> None:
@@ -142,8 +171,14 @@ if usuario["rol"] not in PANTALLAS:
 
 pagina = st.navigation(paginas(PANTALLAS[usuario["rol"]]), position="sidebar", expanded=True)  # sin «ver más»
 
+# Barra lateral: la marca arriba (st.logo, nativo), el menú del rol en medio, cerrar sesión y,
+# pegado al fondo, «Una herramienta de» + Soagro.
+st.logo(str(ui.LOGO), size="large", icon_image=str(ui.ICONO_APP))
 with st.sidebar:
     st.button("Cerrar sesión", icon=":material/logout:", on_click=cerrar_sesion, width="stretch")
+    with st.container(key="sidebar_pie"):
+        st.caption("Una herramienta de")
+        st.image(str(ui.SOAGRO), width=120)
 
 ui.encabezado(usuario)
 ui.aviso_guardado()
