@@ -50,6 +50,7 @@ table.ag-cal th.hoy {background: #004846; color: #FFF4E8;}
 table.ag-cal td {border-top: 1px solid #EBE2DD; padding: .35rem .4rem; vertical-align: top; min-width: 105px;}
 table.ag-cal td.nombre {font-weight: 600; min-width: 120px;}
 table.ag-cal td.hoy {background: #FFF4E8;}
+table.ag-cal th.fuera, table.ag-cal td.fuera {opacity: .45;}   /* día de la semana fuera del periodo elegido */
 .ag-crono {display: grid; grid-template-columns: repeat(7, minmax(128px, 1fr)); gap: .5rem; overflow-x: auto;}
 .ag-dia {background: #FFFFFF; border: 1px solid #EBE2DD; border-radius: 8px; padding: .45rem; min-height: 140px;}
 .ag-dia.hoy {border: 2px solid #004846;}
@@ -88,6 +89,9 @@ table.ag-cal td.hoy {background: #FFF4E8;}
 [class*="st-key-tarjeta_"] a[data-testid="stPageLink-NavLink"] {background: #004846; justify-content: center;
   border-radius: 8px; padding: .55rem .8rem;}
 [class*="st-key-tarjeta_"] a[data-testid="stPageLink-NavLink"] * {color: #FFF4E8 !important; font-weight: 600;}
+/* cajitas (st.metric): la etiqueta pasa a dos renglones en vez de cortarse con «…» */
+[data-testid="stMetricLabel"], [data-testid="stMetricLabel"] * {white-space: normal !important;
+  overflow: visible !important; text-overflow: clip !important; height: auto !important;}
 .ag-cifra {background: #FFFFFF; border: 1px solid #EBE2DD; border-radius: 8px; padding: .8rem 1rem;}
 .ag-cifra div {font-size: 32px; font-weight: 700; line-height: 1.2;}
 .ag-cifra small {font-size: 14px; opacity: .85;}
@@ -242,11 +246,17 @@ def jornales(j: float) -> str:
 def tabla(df: pd.DataFrame, dinero: Iterable[str] = (), kilos: Iterable[str] = (),
           cifras: Iterable[str] = (), **kwargs) -> None:
     """st.dataframe con dinero ($ 125.000), kilos y otras cifras en formato colombiano,
-    alineadas a la derecha. `cifras`: números sin unidad (jornales, mm, ha)."""
+    alineadas a la derecha. `cifras`: números sin unidad (jornales, mm, ha).
+    Sin filas (o sin columnas) muestra «Sin datos para mostrar.» y no dibuja la tabla."""
+    if df.empty:
+        sin_datos("Sin datos para mostrar.")
+        return
     df = df.copy()
     config = dict(kwargs.pop("column_config", {}) or {})
     for columnas, formato in ((dinero, pesos), (kilos, kg), (cifras, lambda v: numero(v, 1).removesuffix(",0"))):
         for col in columnas:
+            if col not in df.columns:         # guarda: una columna pedida que la tabla no trae
+                continue
             df[col] = df[col].map(lambda v: "" if pd.isna(v) else formato(v))
             # Ancho explícito: el automático se calcula antes de cargar Montserrat (más ancha) y recorta cifras.
             ancho = max([len(col), *(len(x) for x in df[col])]) * 9 + 28

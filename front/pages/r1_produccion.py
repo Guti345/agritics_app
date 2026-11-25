@@ -8,7 +8,6 @@ import streamlit as st
 
 import api
 import graficos as g
-import mapa
 import ui
 
 st.title("Producción")
@@ -38,7 +37,11 @@ with cafe_tab:
     m1.metric("Café cereza recogido", ui.kg(finca["kg"], 0), border=True, help="En el rango elegido")
     m2.metric("Rendimiento (kg/ha)", ui.numero(finca["kg_ha"], 0), border=True,
               help=f"Sobre {ui.numero(finca['area_ha'], 2)} ha de café")
-    m3.metric("Acumulado del año", ui.kg(finca["kg_acumulado_anio"], 0), border=True)
+    # Estático: del 1 de enero a hoy, sin importar las fechas del filtro (la API lo acumula
+    # hasta «Hasta»; por eso va en una lectura aparte, con el mismo lote).
+    anio = ui.leer(lambda: api.get("/reportes/r1-produccion", desde=date(hoy.year, 1, 1), hasta=hoy, lote_id=lote_id))
+    m3.metric("Acumulado del año vigente", ui.kg(anio["finca"]["kg_acumulado_anio"], 0), border=True,
+              help="Del 1 de enero a hoy; NO cambia con el filtro de fechas")
     m4.metric("Recibos de venta", len(r1["ventas_por_recibo"]), border=True)
 
     # ── kg de cereza por día, por lote ──
@@ -49,11 +52,11 @@ with cafe_tab:
     else:
         dias["fecha"] = pd.to_datetime(dias["fecha"])
         fig = go.Figure()
-        for nombre in sorted(dias["lote"].unique()):
+        for nombre in sorted(dias["lote"].unique()):   # una línea por lote, sin apilar
             d = dias[dias["lote"] == nombre]
-            fig.add_bar(x=d["fecha"], y=d["kg"], name=nombre, marker_color=COLOR_LOTE.get(nombre, g.TINTA),
-                        hovertemplate="%{y:,.0f} kg")
-        fig.update_layout(barmode="stack")
+            fig.add_scatter(x=d["fecha"], y=d["kg"], name=nombre, mode="lines+markers",
+                            line=dict(color=COLOR_LOTE.get(nombre, g.TINTA), width=2), marker=dict(size=6),
+                            hovertemplate="%{y:,.0f} kg")
         g.mostrar(g.eje_meses(g.tema(fig, titulo_y="kg de cereza"), desde, hasta), key="r1_dia")
 
     # ── ventas por semana (barras) + factor de cada recibo (línea, eje derecho) ──
@@ -104,26 +107,12 @@ with cafe_tab:
                 "Kg netos": recibos["kg_netos"], "Pergamino equivalente": recibos["kg_pergamino_equivalente"],
                 "Factor": recibos["factor_rendimiento"], "Valor": recibos["valor_total"],
             }), dinero=["Valor"], kilos=["Kg netos", "Pergamino equivalente"], cifras=["Factor"])
+        else:
+            ui.sin_datos("Sin recibos de venta de café en el rango.")
 
     # ── por lote ──
     st.subheader("Producción por lote")
     por_lote = r1["por_lote"]
-    lotes_con_mapa = [l for l in lotes if l.get("poligono")]
-    if lotes_con_mapa:
-        import plotly.express as px   # solo si algún lote trae su polígono GeoJSON
-        kg_por_id = {p["lote_id"]: p["kg_ha_acumulado_anio"] for p in por_lote}
-        geo = {"type": "FeatureCollection", "features": [
-            {"type": "Feature", "id": l["id"], "properties": {"nombre": l["nombre"]}, "geometry": l["poligono"]}
-            for l in lotes_con_mapa]}
-        fig_mapa = px.choropleth_map(
-            pd.DataFrame([{"id": l["id"], "Lote": l["nombre"], "kg/ha del año": kg_por_id.get(l["id"], 0)}
-                          for l in lotes_con_mapa]),
-            geojson=geo, locations="id", color="kg/ha del año", hover_name="Lote",
-            color_continuous_scale=["#EBE2DD", "#009C48", "#004846"], map_style="carto-positron",
-            **dict(zip(("center", "zoom"), mapa.encuadre(
-                [p[0] for l in lotes_con_mapa for pz in mapa.piezas(l["poligono"]) for p in pz[0]],
-                [p[1] for l in lotes_con_mapa for pz in mapa.piezas(l["poligono"]) for p in pz[0]], ancho=900, alto=420))))
-        g.mostrar(g.tema(fig_mapa, alto=420), key="r1_mapa")
     if por_lote:
         tabla = pd.DataFrame([{
             "Lote": p["lote"], "Área (ha)": p["area_ha"], "Kg en el rango": p["kg"], "Kg/ha en el rango": p["kg_ha"],
@@ -136,17 +125,18 @@ with cafe_tab:
             ui.tabla(tabla, kilos=["Kg en el rango", "Kg del año"], cifras=["Área (ha)", "Kg/ha en el rango", "Kg/ha del año"])
         with c2:
             orden = sorted(por_lote, key=lambda p: p["kg_ha_acumulado_anio"])
+            mejor = orden[-1]["lote"]               # el de mayor kg/ha del año, destacado
             fig = go.Figure(go.Bar(
                 y=[p["lote"] for p in orden], x=[p["kg_ha_acumulado_anio"] for p in orden], orientation="h",
-                marker_color=[COLOR_LOTE.get(p["lote"], g.TINTA) for p in orden],
+                marker_color=[g.TINTA if p["lote"] == mejor else "rgba(0,201,75,0.45)" for p in orden],
                 text=[ui.numero(p["kg_ha_acumulado_anio"]) for p in orden], textposition="outside",
                 hovertemplate="%{y}: %{x:,.0f} kg/ha<extra></extra>"))
             fig.update_layout(showlegend=False, hovermode="closest")
             g.mostrar(g.tema(fig, alto=320, titulo_y=None).update_xaxes(title_text="kg/ha de cereza en el año",
                                                                         showgrid=True, gridcolor=g.ARENA),
                       key="r1_lotes")
-        if not lotes_con_mapa:
-            st.caption("Los lotes no tienen su polígono cargado: cuando lo tengan, aquí aparece el mapa por producción.")
+    else:
+        ui.sin_datos("Sin lotes de café para mostrar con este filtro.")
 
 # ═══ PLÁTANO ═══════════════════════════════════════════════════════════════════
 with platano_tab:

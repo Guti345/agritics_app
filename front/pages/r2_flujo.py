@@ -72,7 +72,7 @@ b2.metric("Saldo de caja al cierre", ui.pesos(r2["saldo_final"]), border=True)
 if vista == "Día":
     detalle = r2["detalle"]
     if not detalle:
-        ui.sin_datos()
+        ui.sin_datos("Sin movimientos de caja en el rango.")
     else:
         filas = [{"Fecha": ui.fecha_corta(ui.a_fecha(l["fecha"])), "Tipo": TIPOS.get(l["tipo"], l["tipo"]),
                   "Categoría": l["categoria"].replace("_", " ").capitalize(), "Descripción": l["descripcion"],
