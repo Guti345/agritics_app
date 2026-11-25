@@ -28,15 +28,23 @@ COLUMNAS_SEMANAS = [
     ("Nómina", PESOS, 13), ("Nómina (registrada como gasto)", PESOS, 15), ("Insumos", PESOS, 13),
     ("Servicios", PESOS, 13), ("Transporte", PESOS, 13), ("Casa", PESOS, 12), ("Otros", PESOS, 12),
     ("Total egresos", PESOS, 15), ("Margen", PESOS, 15),
-    ("Aportes de capital", PESOS, 15), ("Retiros", PESOS, 13), ("Ajustes", PESOS, 12), ("Flujo neto", PESOS, 15),
+    ("Aportes de capital", PESOS, 15), ("Retiros", PESOS, 13), ("Ajustes", PESOS, 12),
+    ("Préstamos recibidos", PESOS, 15), ("Abonos a deuda", PESOS, 14), ("Pago de intereses", PESOS, 14),
+    ("Flujo neto", PESOS, 15),
 ]
+
+# Movimientos de caja (capital y deuda): nombre legible en la hoja de detalle.
+MOVIMIENTOS = {"aporte_capital": "Aporte de capital", "retiro": "Retiro", "ajuste": "Ajuste",
+               "prestamo_recibido": "Préstamo recibido", "abono_deuda": "Abono a deuda",
+               "pago_intereses": "Pago de intereses"}
 
 
 def _fila_semana(p: dict) -> list:
     i, g, c = p["ingresos"], p["gastos"], p["capital"]
     return [p["periodo"], p["desde"], p["hasta"], i["cafe"], i["platano"], i["total"],
             g["nomina"], g["nomina_registrada_como_gasto"], g["insumos"], g["servicios"], g["transporte"],
-            g["casa"], g["otros"], g["total"], p["margen"], c["aportes"], c["retiros"], c["ajustes"], p["flujo_neto"]]
+            g["casa"], g["otros"], g["total"], p["margen"], c["aportes"], c["retiros"], c["ajustes"],
+            c.get("prestamos", 0), c.get("abonos_deuda", 0), c.get("intereses", 0), p["flujo_neto"]]
 
 
 def _hoja(ws, titulo: str, subtitulo: str, columnas: list, filas: list[list], total: list | None = None) -> None:
@@ -79,13 +87,15 @@ def consolidado_xlsx(semana: str, flujo_anio: dict, flujo_semana: dict, nomina_s
     filas = [_fila_semana(p) for p in flujo_anio["semanas"]]
     total = _fila_semana({**flujo_anio["total"], "periodo": "TOTAL"})
     _hoja(ws, f"Finca Portugal · Ingresos vs Egresos {flujo_anio['hasta'].year} (hasta {semana})",
-          generado + " Aportes, retiros y ajustes van aparte: no entran al margen.", COLUMNAS_SEMANAS, filas, total)
+          generado + " Capital y deuda (aportes, retiros, ajustes, préstamos, abonos e intereses) van aparte, "
+          "cada uno en su columna: no entran al margen.", COLUMNAS_SEMANAS, filas, total)
 
     ws = wb.create_sheet(f"Detalle {semana}")
     columnas = [("Fecha", "fecha", 11), ("Tipo", None, 10), ("Categoría", None, 26), ("Descripción", None, 40),
                 ("Valor", PESOS, 15), ("Saldo de caja", PESOS, 16)]
     filas = [[flujo_semana["desde"], "", "", "Saldo inicial", None, flujo_semana["saldo_inicial"]]]
-    filas += [[l["fecha"], l["tipo"], l["categoria"], l["descripcion"], l["valor"], l["saldo"]] for l in flujo_semana["detalle"]]
+    filas += [[l["fecha"], l["tipo"], MOVIMIENTOS.get(l["categoria"], l["categoria"]) if l["tipo"] == "capital" else l["categoria"],
+               l["descripcion"], l["valor"], l["saldo"]] for l in flujo_semana["detalle"]]
     _hoja(ws, f"Movimientos de caja día a día · {semana} ({flujo_semana['desde']:%Y-%m-%d} a {flujo_semana['hasta']:%Y-%m-%d})",
           generado, columnas, filas,
           [flujo_semana["hasta"], "", "", "Saldo final", flujo_semana["saldo_final"] - flujo_semana["saldo_inicial"],

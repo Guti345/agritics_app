@@ -13,7 +13,7 @@ COLECCIONES = {"labor_diaria": "Labor diaria", "lotes": "Lotes", "labores": "Lab
                "trabajadores": "Trabajadores", "insumos": "Insumos", "unidades": "Unidades",
                "venta_cafe": "Venta de café", "venta_platano": "Venta de plátano", "compra_insumo": "Compra de insumos",
                "gasto": "Gastos", "movimiento_caja": "Caja", "cosecha_platano": "Cosecha de plátano",
-               "lluvia": "Lluvia", "pool_semana": "Pool", "usuarios": "Usuarios", "cierres": "Cortes"}
+               "lluvia": "Lluvia", "pool_semana": "Pool", "usuarios": "Usuarios", "cierres": "Pagos de nómina"}
 
 
 def texto(v) -> str:

@@ -11,7 +11,6 @@ from datetime import datetime, time
 import streamlit as st
 
 import api
-import campo
 import ui
 
 UNIDAD = {"kg": "kg", "hectareas": "ha", "jornales": "jornales", "racimos": "racimos", "ninguna": None}
@@ -44,12 +43,8 @@ with labor_tab:
     insumos = ui.leer(lambda: api.lista("/insumos"))
 
     # El catálogo de labores (las 14 estables de la finca) lo maneja solo el administrador,
-    # en Catálogos. El mayordomo crea trabajadores en su pantalla «Trabajadores»; el
-    # administrador conserva aquí el atajo.
-    if not ui.puede("mayordomo"):
-        nuevo_trab, _ = st.columns(2)
-        with nuevo_trab.expander("+ Crear trabajador"):
-            campo.form_trabajador()
+    # en Catálogos. Los trabajadores se crean en la pantalla «Trabajadores» (mayordomo y
+    # administrador ven esta misma pantalla).
 
     # Sin st.form: los campos dependen unos de otros (labor -> forma de pago -> meta).
     # Lo digitado vive en st.session_state (key=...) y solo se limpia al guardar.
@@ -59,9 +54,8 @@ with labor_tab:
     trabajador = c2.selectbox("Trabajador", list(pool), index=None, key="lab_trabajador",
                               placeholder="Elige del pool de la semana")
     if not pool:
-        donde = "Trabajadores › Pool de trabajadores" if ui.puede("mayordomo") else "Pool de trabajadores"
         st.warning(f"No hay trabajadores activos en la {ui.rotulo_semana(ui.semana_iso(fecha))}: "
-                   f"actívalos en {donde}.", icon=":material/group_off:")
+                   "actívalos en Trabajadores › Pool de trabajadores.", icon=":material/group_off:")
 
     lote_nombre = c1.selectbox("Lote", [l["nombre"] for l in lotes], index=None, key="lab_lote",
                                placeholder="Elige el lote")

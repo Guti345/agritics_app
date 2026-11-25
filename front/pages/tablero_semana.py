@@ -55,8 +55,8 @@ k[3].metric("Trabajadores activos", len(pool), border=True)
 st.subheader("Alertas")
 if not alertas["alertas"] and not alertas["insumos_bajo_umbral"]:
     st.success("Sin alertas esta semana.", icon=":material/check_circle:")
-for texto in alertas["alertas"]:            # tal cual las da la API
-    st.warning(texto, icon=":material/warning:")
+for texto in alertas["alertas"]:            # tal cual las da la API («corte» se lee «pago»)
+    st.warning(ui.sin_corte(texto), icon=":material/warning:")
 if alertas["insumos_bajo_umbral"]:
     st.markdown("**Revisar existencias**")
     cant = lambda v: ui.numero(v, 2).removesuffix(",00").removesuffix("0") if v % 1 else ui.numero(v)  # noqa: E731
@@ -71,7 +71,7 @@ q1, q2, q3 = st.columns(3)
 q1.metric("Jornales registrados / en nómina",
           f"{ui.numero(cuadres['jornales_registrados'], 1).removesuffix(',0')} / "
           f"{ui.numero(cuadres['jornales_en_nomina'], 1).removesuffix(',0')}", border=True,
-          help="Jornales de labores a jornal de la semana vs. los pagados en cortes o listos para el próximo")
+          help="Jornales de labores a jornal de la semana vs. los ya pagados o listos para el próximo pago")
 q2.metric("Kg cereza recogidos / vendidos",
           f"{ui.numero(cuadres['kg_cereza_recogidos'])} / {ui.numero(cuadres['kg_cafe_vendidos'])}", border=True,
           help="Recogido en labores vs. kilos netos de los recibos de la Cooperativa")

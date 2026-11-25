@@ -1,5 +1,5 @@
 """Administrador: libro de la finca. Ventas de café y plátano, compras de insumos y gastos,
-cada uno con su formulario corto y los registros de la semana elegida."""
+cada uno con su formulario corto y sus últimos 20 registros (más recientes primero) con el total."""
 
 from datetime import timedelta
 
@@ -14,16 +14,25 @@ CATEGORIAS = {"insumos": "Insumos", "servicios": "Servicios", "transporte": "Tra
               "otros": "Otros", "nomina": "Nómina (pagos por fuera de la semanal)"}
 
 
+ULTIMOS = 20
+
+
+def recientes(ruta: str) -> list[dict]:
+    """Los últimos registros (la API los entrega del más reciente al más antiguo)."""
+    return ui.leer(lambda: api.get(ruta))[:ULTIMOS]
+
+
+def total_recientes(filas: list[dict], campo: str) -> None:
+    st.caption(f"Total de {'estos' if len(filas) > 1 else 'este'} {len(filas)} "
+               f"{'registros' if len(filas) > 1 else 'registro'}: {ui.pesos(sum(f[campo] for f in filas))}")
+
+
 def faltante(*pares) -> str | None:
     """Primer mensaje cuyo campo falta (para no mandar a la API campos vacíos)."""
     return next((m for falta, m in pares if falta), None)
 
 
 st.title("Ventas, compras y gastos")
-c1, _ = st.columns([1, 2])
-semana = ui.elegir_semana("Semana del libro", key="libro_semana", donde=c1)
-dias = ui.dias_de(semana)
-rango = {"desde": dias[0], "hasta": dias[-1]}
 
 cafe_tab, platano_tab, compra_tab, gasto_tab = st.tabs(
     [":material/coffee: Venta de café", ":material/nutrition: Venta de plátano",
@@ -98,18 +107,18 @@ with cafe_tab:
                                "vc_pasilla", "vc_broca", "vc_factor", "vc_precio", "vc_total",
                                "vc_pedido", "vc_comprobante"])
 
-    st.subheader("Recibos de la semana")
-    ventas = ui.leer(lambda: api.get("/ventas-cafe", **rango))
+    st.subheader(f"Últimos {ULTIMOS} recibos")
+    ventas = recientes("/ventas-cafe")
     if ventas:
         ui.tabla(pd.DataFrame([{
-            "Fecha": ui.dia_corto(ui.a_fecha(v["fecha"])), "Almacén": v["almacen"],
+            "Fecha": ui.fecha_corta(ui.a_fecha(v["fecha"])), "Almacén": v["almacen"],
             "Producto": PRODUCTOS[v["tipo_producto"]], "Sacos": v["sacos"], "Kg netos": v["kg_netos"],
             "Pergamino eq.": v["kg_pergamino_equivalente"], "Factor": v["factor_rendimiento"],
             "Valor total": v["valor_total"]} for v in ventas]),
             dinero=["Valor total"], kilos=["Kg netos", "Pergamino eq."], cifras=["Factor"])
-        st.caption(f"Total de la semana: {ui.pesos(sum(v['valor_total'] for v in ventas))}")
+        total_recientes(ventas, "valor_total")
     else:
-        ui.sin_datos("Sin recibos de café en esta semana.")
+        ui.sin_datos("Sin recibos de café registrados.")
 
 # ═══ VENTA DE PLÁTANO ══════════════════════════════════════════════════════════
 with platano_tab:
@@ -143,17 +152,17 @@ with platano_tab:
                 limpiar=["vp_comprador", "vp_kg", "vp_racimos", "vp_precio", "vp_cosecha"],
                 exito=f"Registro guardado: venta de plátano por {ui.pesos(total_p)}")
 
-    st.subheader("Ventas de la semana")
-    ventas_p = ui.leer(lambda: api.get("/ventas-platano", **rango))
+    st.subheader(f"Últimas {ULTIMOS} ventas")
+    ventas_p = recientes("/ventas-platano")
     if ventas_p:
         ui.tabla(pd.DataFrame([{
-            "Fecha": ui.dia_corto(ui.a_fecha(v["fecha"])), "Comprador": v["comprador"], "Kg": v["kg"],
+            "Fecha": ui.fecha_corta(ui.a_fecha(v["fecha"])), "Comprador": v["comprador"], "Kg": v["kg"],
             "Racimos": v["racimos"], "Calidad": v["calidad"].capitalize(), "Precio por kg": v["precio_kg"],
             "Valor total": v["valor_total"]} for v in ventas_p]),
             dinero=["Precio por kg", "Valor total"], kilos=["Kg"])
-        st.caption(f"Total de la semana: {ui.pesos(sum(v['valor_total'] for v in ventas_p))}")
+        total_recientes(ventas_p, "valor_total")
     else:
-        ui.sin_datos("Sin ventas de plátano en esta semana.")
+        ui.sin_datos("Sin ventas de plátano registradas.")
 
 # ═══ COMPRA DE INSUMOS ═════════════════════════════════════════════════════════
 with compra_tab:
@@ -185,18 +194,18 @@ with compra_tab:
             ui.enviar(comprar, limpiar=["ci_insumo", "ci_cantidad", "ci_valor"], refrescar=True,
                       exito=f"Registro guardado: compra de {insumo['nombre']} por {ui.pesos(valor_c)}")
 
-    st.subheader("Compras de la semana")
-    compras = ui.leer(lambda: api.get("/compras-insumos", **rango))
+    st.subheader(f"Últimas {ULTIMOS} compras")
+    compras = recientes("/compras-insumos")
     if compras:
         por_id = {i["id"]: i for i in insumos}
         ui.tabla(pd.DataFrame([{
-            "Fecha": ui.dia_corto(ui.a_fecha(x["fecha"])),
+            "Fecha": ui.fecha_corta(ui.a_fecha(x["fecha"])),
             "Insumo": por_id.get(x["insumo_id"], {}).get("nombre", "?"),
             "Cantidad": f"{ui.numero(x['cantidad'], 1).removesuffix(',0')} {por_id.get(x['insumo_id'], {}).get('unidad', '')}",
             "Valor": x["valor"]} for x in compras]), dinero=["Valor"])
-        st.caption(f"Total de la semana: {ui.pesos(sum(x['valor'] for x in compras))}")
+        total_recientes(compras, "valor")
     else:
-        ui.sin_datos("Sin compras de insumos en esta semana.")
+        ui.sin_datos("Sin compras de insumos registradas.")
 
 # ═══ GASTOS ════════════════════════════════════════════════════════════════════
 with gasto_tab:
@@ -217,12 +226,12 @@ with gasto_tab:
                           limpiar=["g_valor", "g_descripcion"],
                           exito=f"Registro guardado: gasto de {ui.pesos(valor_g)} en {CATEGORIAS[categoria].lower()}")
 
-    st.subheader("Gastos de la semana")
-    gastos = ui.leer(lambda: api.get("/gastos", **rango))
+    st.subheader(f"Últimos {ULTIMOS} gastos")
+    gastos = recientes("/gastos")
     if gastos:
         ui.tabla(pd.DataFrame([{
-            "Fecha": ui.dia_corto(ui.a_fecha(g["fecha"])), "Categoría": CATEGORIAS[g["categoria"]].split(" (")[0],
+            "Fecha": ui.fecha_corta(ui.a_fecha(g["fecha"])), "Categoría": CATEGORIAS[g["categoria"]].split(" (")[0],
             "Descripción": g["descripcion"] or "", "Valor": g["valor"]} for g in gastos]), dinero=["Valor"])
-        st.caption(f"Total de la semana: {ui.pesos(sum(g['valor'] for g in gastos))}")
+        total_recientes(gastos, "valor")
     else:
-        ui.sin_datos("Sin gastos en esta semana.")
+        ui.sin_datos("Sin gastos registrados.")

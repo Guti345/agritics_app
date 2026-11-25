@@ -8,6 +8,7 @@ Reglas de UX que se aplican desde aquí:
 - Dinero "$ 125.000", kilos con coma decimal solo si aplica, cifras alineadas a la derecha.
 """
 
+import re
 from base64 import b64encode
 from collections.abc import Callable, Iterable
 from datetime import date, datetime, time, timedelta, timezone
@@ -92,6 +93,8 @@ table.ag-cal th.fuera, table.ag-cal td.fuera {opacity: .45;}   /* día de la sem
 /* cajitas (st.metric): la etiqueta pasa a dos renglones en vez de cortarse con «…» */
 [data-testid="stMetricLabel"], [data-testid="stMetricLabel"] * {white-space: normal !important;
   overflow: visible !important; text-overflow: clip !important; height: auto !important;}
+.ag-capital p {display: flex; justify-content: space-between; margin: .1rem 0; font-size: 13px;}
+.ag-capital div {font-size: 26px !important;}
 .ag-cifra {background: #FFFFFF; border: 1px solid #EBE2DD; border-radius: 8px; padding: .8rem 1rem;}
 .ag-cifra div {font-size: 32px; font-weight: 700; line-height: 1.2;}
 .ag-cifra small {font-size: 14px; opacity: .85;}
@@ -142,6 +145,30 @@ def elegir_semana(rotulo: str = "Semana", key: str = "semana", donde=None,
     base = hoy()
     opciones = [semana_iso(base + timedelta(weeks=adelante - k)) for k in range(adelante + atras + 1)]
     return (donde or st).selectbox(rotulo, opciones, index=adelante, format_func=rotulo_semana, key=key)
+
+
+# Movimientos de caja (capital y deuda): entran o salen de caja, NUNCA son ingreso ni gasto
+# operacional. El valor se guarda positivo (salvo el ajuste) y el tipo dice si sale.
+MOVIMIENTOS_CAJA = {"aporte_capital": "Aporte de capital", "retiro": "Retiro", "ajuste": "Ajuste",
+                    "prestamo_recibido": "Préstamo recibido", "abono_deuda": "Abono a deuda",
+                    "pago_intereses": "Pago de intereses"}
+SALEN_DE_CAJA = {"retiro", "abono_deuda", "pago_intereses"}
+
+
+def sin_corte(texto: str) -> str:
+    """En pantalla la nómina se «paga»: la palabra «corte» de la API (pagada en el corte 2 de
+    2026-W48, semana cortada completa...) se muestra como «pago»."""
+    texto = re.sub(r"pagada en el corte (\d+) de (\d{4})-W(\d{2})",
+                   lambda m: f"pagada en el pago {m[1]} de la semana {int(m[3])}", texto)
+    texto = re.sub(r"cortada completa", "pagada completa", texto)
+    texto = re.sub(r"\bcortes\b", "pagos", texto)
+    texto = re.sub(r"\bCorte\b", "Pago", texto)
+    return re.sub(r"\bcorte\b", "pago", texto)
+
+
+def efecto_en_caja(tipo: str, valor: float) -> float:
+    """Valor con su signo en la caja (los que salen, negativos)."""
+    return -valor if tipo in SALEN_DE_CAJA else valor
 
 
 MESES_LARGOS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre",

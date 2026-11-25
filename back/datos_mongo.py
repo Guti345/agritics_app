@@ -1,8 +1,10 @@
-"""Agritics · limpieza total + seed de un año cafetero (5 de enero - sábado 14 de noviembre de 2026).
+"""Agritics · limpieza total + seed de un año cafetero (5 de enero - sábado 14 de noviembre de 2026)
+y la coyuntura de la semana de la sustentación (16 de noviembre - 6 de diciembre). UNA corrida deja
+TODO listo: no hay otro script de datos.
 
 Uso (desde la raíz del repo):
     python back/datos_mongo.py              DRY-RUN: muestra qué borraría y qué cargaría. No toca nada.
-    python back/datos_mongo.py --confirmar  Limpia (delete_many, sin drop) y carga el seed.
+    python back/datos_mongo.py --confirmar  Limpia (delete_many, sin drop) y carga todo.
 
 Fase 1 · LIMPIEZA: corre back/init_db.py (idempotente), borra TODOS los documentos de TODAS
 las colecciones (la lista sale de back/init_db.py) con delete_many({}) -validadores e
@@ -11,7 +13,21 @@ placeholders del seed).
 Fase 2 · SEED: inserta directo a Mongo, pero cada documento se arma con su DTO de
 back/app/schemas/ (mismas validaciones que la API) y respeta las reglas de back/app/reglas/
 (pool, regla estrella, stock, periodos cerrados, cortes y anticipos). random.seed fijo e ids
-deterministas: --confirmar deja siempre el mismo mundo.
+deterministas: --confirmar deja siempre el mismo mundo (la limpieza de la fase 1 borra cualquier
+prueba anterior, así que correrlo dos veces deja lo mismo).
+Coyuntura (misma corrida, a continuación del año; ver Mundo.coyuntura): solo labores, pool, el
+corte de la W47 y un aporte de capital.
+  - W47 (16-22/11): pool, labores completadas lunes a sábado y su corte del sábado 21/11 a las
+    6:30 p. m. Como en la API, ese corte paga TODO lo completado sin corte hasta el 21/11: también
+    las 38 labores de la W46 que el año deja pendientes a propósito.
+  - W48 (23-29/11, la actual; hoy miércoles 25): pool; lunes y martes completadas SIN corte (las
+    paga el administrador desde la app, en «Pagar nómina»); miércoles a viernes, planeadas
+    (preasignación del pool).
+  - W49 (30/11-6/12): pool activado el 25/11 y preasignación de lunes a sábado (programación futura).
+  - Sin ventas, compras ni lluvias nuevas. Única excepción de caja: un aporte de capital el lunes
+    16/11, redondo, para que la caja nunca quede negativa día a día desde el 16/11, aun restando lo
+    que se pagará de la W48. Las labores de la coyuntura no consumen insumos y la recolección de
+    plátano va sin cosecha ni venta registradas (solo la labor y sus kg).
 
 ═══════════════════════════════════════════════════════════════════════════════════════════
 SUPUESTOS (cifra clave -> origen). "Dueño" = definido por la finca en el prompt del seed;
@@ -20,7 +36,8 @@ SUPUESTOS (cifra clave -> origen). "Dueño" = definido por la finca en el prompt
 Calendario
   - Datos del lunes 5 ene (ISO 2026-W02) al sábado 14 nov 2026 (W46). W01 (29 dic-4 ene) sin datos.
   - Campo: lunes a sábado; domingo descanso (solo lecturas de lluvia).            [Dueño]
-  - W02-W45 cortadas; W46 abierta, con 3 labores sin completar.                   [Dueño]
+  - W02-W45 cortadas; W46 sin corte propio, con 3 labores sin completar (sus completadas las
+    paga el corte de la W47 de la coyuntura).                                     [Dueño]
 Lotes (área, variedad)                                                          [Dueño]
   - Portugal 2,40 ha Castillo | Oriente 1,60 Colombia | Villa Aurora 2,80 Castillo
   - Centro 0,60 Colombia | Madroño 1,55 Cenicafé | Minitas 2,50 Castillo | La Casa 2,40 Colombia
@@ -134,6 +151,14 @@ CLAVE_USUARIOS = "agritics2026"          # la misma para los 4 usuarios del MVP 
 INICIO = date(2026, 1, 5)                # lunes, ISO 2026-W02
 FIN = date(2026, 11, 14)                 # sábado de la W46
 SEMANA_ABIERTA = "2026-W46"
+
+# Coyuntura de la sustentación (Mundo.coyuntura): del lunes 16/11 al sábado 5/12.
+INICIO_DEMO = date(2026, 11, 16)         # lunes de la W47
+HOY_DEMO = date(2026, 11, 25)            # miércoles de la W48: el día de la sustentación
+FIN_DEMO = date(2026, 12, 6)             # domingo de la W49
+W47, W48, W49 = 47, 48, 49
+DIAS_PLATANO_DEMO = (1, 4)               # martes y viernes, como el seed en cosecha
+NOTA_APORTE_DEMO = "Aporte de la familia para la nómina de noviembre"
 P_CAPTURA_TARDE = 0.175                  # de lunes a viernes -> ~85 % del total el mismo día
 
 FOTO_RECIBO = "fotos/placeholder_recibo.jpg"
@@ -338,6 +363,8 @@ class Mundo:
         return ObjectId(f"{_BASE_ID:08x}{self._n:016x}")
 
     def tarde(self, dia: date) -> bool:
+        if dia >= lunes_de(W48):        # la semana de la sustentación: nada «al día siguiente» en el futuro
+            return False
         return dia.weekday() <= 4 and self.r.random() < P_CAPTURA_TARDE
 
     def captura(self, dia: date, h: int, m: int, puede_tarde: bool = True, quien_madruga: bool = False) -> datetime:
@@ -956,6 +983,116 @@ class Mundo:
             saldo = s
             lunes += timedelta(days=7)
 
+    # ── coyuntura de la sustentación (W47-W49) ──
+    def pool_coyuntura(self) -> list[dict]:
+        """Los recurrentes y 2-3 esporádicos (los "de una vez" ya pasaron por la finca)."""
+        recurrentes = [t for t in self.trabajadores if t["_tipo"] == "recurrente"]
+        esporadicos = [t for t in self.trabajadores if t["_tipo"] == "esporadico"]
+        return recurrentes + self.r.sample(esporadicos, self.r.choice([2, 3, 3]))
+
+    def activar_pool(self, s: int, pool: list, momento: datetime) -> None:
+        for t in pool:
+            doc = PoolSemanaCreate(trabajador_id=str(t["_id"]), semana=f"2026-W{s:02d}", activo=True).a_mongo()
+            t["_pool_doc"] = self.agregar(db.POOL_SEMANA, doc, fecha_activacion=momento,
+                                          registrado_por="mayordomo", fecha_captura=momento)
+
+    def plan_dias(self, s: int, pool: list, dias: range) -> list[dict]:
+        """Las mismas reglas de plan_semana, sin contratos con anticipo y sin consumo de insumos."""
+        f, lunes, plan = self.factor(s), lunes_de(s), []
+        for i in dias:
+            dia = lunes + timedelta(days=i)
+            disponibles = list(pool)
+            self.r.shuffle(disponibles)
+            total = min(len(disponibles), max(3, min(7, round(3 + 4 * f + self.r.uniform(-0.7, 0.7)))))
+            recolectores = 0 if f == 0 else max(0, min(total - 1, round(f * 3.6 + self.r.uniform(-0.6, 0.6))))
+            for j, t in enumerate(disponibles[:total]):
+                if j < recolectores:
+                    kg = max(40, min(160, round(self.r.gauss(55 + 95 * f, 16))))
+                    plan.append({"dia": dia, "t": t, "lote": self.r.choices(self.lotes_cafe, weights=[l["area_ha"] for l in self.lotes_cafe])[0],
+                                 "labor": "Recolección café", "jornales": 1, "avance": float(kg), "insumo": None,
+                                 "forma_pago": "contrato", "tipo_meta": "kilos",
+                                 "tarifa": float(self.r.choice([1900, 2000, 2000, 2000, 2100]))})
+                elif i in DIAS_PLATANO_DEMO and j == recolectores:
+                    plan.append({"dia": dia, "t": t, "lote": self.lote_platano, "labor": "Recolección plátano",
+                                 "jornales": 1, "avance": float(round(self.r.uniform(280, 650))), "insumo": None,
+                                 "forma_pago": "contrato", "tipo_meta": "kilos", "tarifa": float(TARIFA_KG_PLATANO)})
+                else:
+                    p = self.labor_campo(dia, t, self.elegir_labor(s, f), contrato=self.r.random() < 0.08)
+                    p["insumo"] = None                    # sin compras en la coyuntura: no se gasta inventario
+                    plan.append(p)
+        return plan
+
+    def preasignacion(self, plan: list, t: dict, prob: float = 1.0) -> list[dict]:
+        return [{"dia": p["dia"], "lote_id": str(p["lote"]["_id"]), "labor_id": str(self.labores[p["labor"]]["_id"])}
+                for p in plan if p["t"]["_id"] == t["_id"] and self.r.random() < prob]
+
+    def guardar_preasignacion(self, s: int, t: dict, pre: list[dict]) -> None:
+        doc = PoolSemanaCreate(trabajador_id=str(t["_id"]), semana=f"2026-W{s:02d}", activo=True,
+                               preasignacion=pre).a_mongo()
+        t["_pool_doc"]["preasignacion"] = doc["preasignacion"]
+
+    def coyuntura_w47(self):
+        lunes, sabado = lunes_de(W47), lunes_de(W47) + timedelta(days=5)
+        pool = self.pool_coyuntura()
+        self.activar_pool(W47, pool, en(lunes, 6, self.r.randint(0, 20)))
+        plan = self.plan_dias(W47, pool, range(6))
+        for p in plan:
+            self.emitir_labor(p, W47)
+        for t in pool:                                    # lo planeado el lunes: casi todo se cumplió
+            self.guardar_preasignacion(W47, t, self.preasignacion(plan, t, 0.8 if t["_tipo"] == "recurrente" else 0.5))
+        # Corte normal del sábado: como en la API, paga TODO lo completado sin corte hasta ese día
+        # (también lo que la W46 dejó pendiente).
+        momento = en(sabado, 18, 30)
+        for d in self.docs[db.LABOR_DIARIA]:
+            if d["completada"] and "corte" not in d and d["fecha"] <= utc_dia(sabado):
+                assert d["fecha_cierre"] <= momento, "labor completada después del corte"
+                d["corte"], d["corte_semana"] = 1, f"2026-W{W47}"
+        self.agregar(db.CIERRES, {"semana": f"2026-W{W47}", "corte": 1, "desde": utc_dia(lunes), "hasta": utc_dia(sabado),
+                                  "cerrada_por": "jaime", "fecha": momento, "anticipos": []})
+
+    def coyuntura_w48(self):
+        pool = self.pool_coyuntura()
+        self.activar_pool(W48, pool, en(lunes_de(W48), 6, self.r.randint(0, 20)))
+        hechas = self.plan_dias(W48, pool, range(2))          # lunes y martes: completadas, sin corte
+        for p in hechas:
+            self.emitir_labor(p, W48)
+        planeadas = self.plan_dias(W48, pool, range(2, 5))    # miércoles a viernes: planeadas
+        for t in pool:
+            pre = self.preasignacion(hechas, t, 0.8 if t["_tipo"] == "recurrente" else 0.5) + self.preasignacion(planeadas, t)
+            self.guardar_preasignacion(W48, t, pre)
+
+    def coyuntura_w49(self):
+        pool = self.pool_coyuntura()
+        self.activar_pool(W49, pool, en(HOY_DEMO, 7, self.r.randint(5, 40)))   # programada el día de la sustentación
+        planeadas = self.plan_dias(W49, pool, range(6))
+        for t in pool:
+            self.guardar_preasignacion(W49, t, self.preasignacion(planeadas, t))
+
+    def aporte_coyuntura(self):
+        """Un aporte redondo el lunes 16/11 para que la caja nunca quede negativa día a día del 16/11 al
+        6/12, aun restando lo que se pagará de la W48 (la nómina ya resta como causada en la fecha de
+        cada labor: restarla otra vez deja un colchón)."""
+        neto = flujo_diario(self.docs)
+        saldo = sum(v for d, v in neto.items() if d < INICIO_DEMO)
+        minimo = saldo
+        dia = INICIO_DEMO
+        while dia <= FIN_DEMO:
+            saldo += neto.get(dia, 0.0)
+            minimo = min(minimo, saldo)
+            dia += timedelta(days=1)
+        por_pagar = sum(self.pactado(d) for d in self.docs[db.LABOR_DIARIA] if d["completada"] and "corte" not in d)
+        faltante = max(0.0, por_pagar - minimo)
+        valor = float(math.ceil((faltante + 500_000) / 500_000) * 500_000)     # + margen, redondo a $500.000
+        self.mover_caja(INICIO_DEMO, "aporte_capital", valor, NOTA_APORTE_DEMO, en(INICIO_DEMO, 7, 0))
+        self.coyuntura_caja = {"minimo_sin_aporte": minimo, "por_pagar_w48": por_pagar, "aporte": valor}
+
+    def coyuntura(self):
+        """W47-W49, a continuación del año, con el mismo generador (mismo azar, mismas reglas)."""
+        self.coyuntura_w47()
+        self.coyuntura_w48()
+        self.coyuntura_w49()
+        self.aporte_coyuntura()
+
     # ── todo el año ──
     def generar(self):
         self.catalogos()
@@ -966,6 +1103,7 @@ class Mundo:
         self.garantizar_caja()
         for nombre, d in self.insumos.items():      # stock final = arranque + compras - consumos
             d["stock_actual"] = round(self.stock[nombre], 2)
+        self.coyuntura()                            # W47-W49: la semana de la sustentación
         for t in self.trabajadores:
             t.pop("_tipo", None)
             t.pop("_pool_doc", None)
@@ -1049,7 +1187,7 @@ async def sembrar(base, m: Mundo) -> None:
 
 async def resumen_final(base) -> None:
     from back.app.reglas.caja import calcular_saldo
-    from back.app.reglas.cortes import recalcular_corte
+    from back.app.reglas.cortes import preview, recalcular_corte
     from back.app.reglas.nomina import nomina
     from back.app.reglas.reportes import adopcion_digital, ids_recoleccion_cafe, r2_flujo_caja
 
@@ -1063,31 +1201,35 @@ async def resumen_final(base) -> None:
     for c in cierres:
         pagado += (await recalcular_corte(base, c))["total"]
     semanas_cortadas = sorted({c["semana"] for c in cierres})
-    filas = await nomina(base, date(2026, 1, 1), FIN)
+    filas = await nomina(base, date(2026, 1, 1), HOY_DEMO)
     recol = await ids_recoleccion_cafe(base)
     kg_cafe = sum([l["avance"] async for l in base[db.LABOR_DIARIA].find({"completada": True, "labor_id": {"$in": recol}})])
     kg_platano = sum([c["kg"] async for c in base[db.COSECHA_PLATANO].find()])
-    flujo = await r2_flujo_caja(base, date(2026, 1, 1), FIN, detalle=False)
-    saldo = await calcular_saldo(base, None, FIN)
-    adop = await adopcion_digital(base, date(2026, 1, 1), FIN)
+    flujo = await r2_flujo_caja(base, date(2026, 1, 1), HOY_DEMO, detalle=False)
+    saldo = await calcular_saldo(base, None, HOY_DEMO)
+    adop = await adopcion_digital(base, date(2026, 1, 1), HOY_DEMO)
     abiertas = await base[db.LABOR_DIARIA].count_documents({"completada": False})
     sin_corte = await base[db.LABOR_DIARIA].count_documents({"completada": True, "corte": {"$exists": False}})
     pesos = lambda v: f"${v:,.0f}".replace(",", ".")  # noqa: E731
     print(f"  cortes: {len(cierres)} en {len(semanas_cortadas)} semanas ({semanas_cortadas[0]}..{semanas_cortadas[-1]}); "
           f"{len(con_anticipo)} cortes con anticipos, {n_anticipos} anticipos en el año")
-    print(f"  semana {SEMANA_ABIERTA}: sin corte; {abiertas} labores abiertas; {sin_corte} completadas por pagar")
+    print(f"  {abiertas} labores abiertas (de la {SEMANA_ABIERTA}); {sin_corte} completadas por pagar (lunes y martes de la W48)")
     print(f"  nómina causada del año: {pesos(sum(t['total'] for t in filas))} | pagada en cortes: {pesos(pagado)}")
     print(f"  kg de café cereza: {kg_cafe:,.0f} | kg de plátano: {kg_platano:,.0f}".replace(",", "."))
     t = flujo["total"]
     print(f"  ingresos {pesos(t['ingresos']['total'])} - gastos {pesos(t['gastos']['total'])} = MARGEN DEL AÑO {pesos(t['margen'])}")
     print(f"  capital: aportes {pesos(t['capital']['aportes'])}, retiros {pesos(t['capital']['retiros'])}, ajustes {pesos(t['capital']['ajustes'])}")
-    print(f"  saldo de caja al {FIN}: {pesos(saldo['saldo'])}")
-    detalle = (await r2_flujo_caja(base, date(2026, 1, 1), FIN, detalle=True))["detalle"]
+    print(f"  saldo de caja al {HOY_DEMO}: {pesos(saldo['saldo'])}")
+    detalle = (await r2_flujo_caja(base, date(2026, 1, 1), HOY_DEMO, detalle=True))["detalle"]
     cierre_dia = {}
     for linea in detalle:                         # saldo de la última línea de cada día
         cierre_dia[linea["fecha"]] = linea["saldo"]
     dia_min = min(cierre_dia, key=cierre_dia.get)
     print(f"  saldo mínimo de caja en el año (cierre del día, R2): {pesos(cierre_dia[dia_min])} el {dia_min}")
+    coy = min((s, d) for d, s in cierre_dia.items() if d >= INICIO_DEMO)
+    pr = await preview(base, f"2026-W{W48}")
+    print(f"  coyuntura: saldo mínimo desde el {INICIO_DEMO:%d/%m} {pesos(coy[0])} el {coy[1]}; por pagar de la W48 "
+          f"(preview) {pesos(pr['total_periodo_abierto'])} -> queda {pesos(coy[0] - pr['total_periodo_abierto'])}")
     print(f"  adopción digital del año: {adop['porcentaje']:.1f} % ({adop['mismo_dia']}/{adop['registros']})")
     bajos = [i["nombre"] async for i in base[db.INSUMOS].find({"$expr": {"$lte": ["$stock_actual", "$umbral_alerta"]}})]
     print(f"  insumos bajo el umbral: {bajos or 'ninguno'}")
@@ -1106,7 +1248,7 @@ async def main() -> None:
             print(f"  {c:<16} {n:>6}")
         fotos = fotos_de_prueba()
         print(f"  fotos de prueba: {len(fotos)} {[f.name for f in fotos]}")
-        print(f"\nCargaría (seed {INICIO} a {FIN}):")
+        print(f"\nCargaría (año {INICIO} a {FIN} + coyuntura W47-W49, del {INICIO_DEMO} al {FIN_DEMO}):")
         for c in COLECCIONES:
             print(f"  {c:<16} {len(mundo.docs[c]):>6}")
         prev = resumen_previsto(mundo)
@@ -1121,6 +1263,19 @@ async def main() -> None:
             if mv["tipo"] == "aporte_capital":
                 aportes[f"{mv['fecha'].month:02d}"] = aportes.get(f"{mv['fecha'].month:02d}", 0) + 1
         print(f"  aportes por mes: {dict(sorted(aportes.items()))}")
+        print("  coyuntura:")
+        d = mundo.docs
+        for s, rotulo in ((W47, "lunes a sábado completadas + corte del sábado 21/11 (paga también lo pendiente de la W46)"),
+                          (W48, "lunes y martes completadas sin corte; miércoles a viernes planeadas"),
+                          (W49, "planeadas de lunes a sábado (pool activado el 25/11)")):
+            etiqueta = f"2026-W{s:02d}"
+            pool = [x for x in d[db.POOL_SEMANA] if x["semana"] == etiqueta]
+            labores = sum(1 for x in d[db.LABOR_DIARIA] if semana_iso(x["fecha"].date()) == etiqueta)
+            print(f"    {etiqueta}: pool {len(pool)} | labores {labores} | preasignaciones "
+                  f"{sum(len(x.get('preasignacion', [])) for x in pool)} · {rotulo}")
+        caja = mundo.coyuntura_caja
+        print(f"    aporte de capital del {INICIO_DEMO:%d/%m}: {pesos(caja['aporte'])} (sin él, la caja bajaría a "
+              f"{pesos(caja['minimo_sin_aporte'])}; por pagar de la W48: {pesos(caja['por_pagar_w48'])})")
         if not confirmar:
             print("\nDRY-RUN: no se borró ni se cargó nada. Para ejecutar: python back/datos_mongo.py --confirmar")
             return

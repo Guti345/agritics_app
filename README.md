@@ -30,7 +30,8 @@ agritics_app/
   back/                  # FastAPI
     main.py              #   app, ruta base /api/v1, Swagger en /docs
     init_db.py           #   crea colecciones con validadores $jsonSchema e índices
-    datos_mongo.py       #   carga los datos simulados (un año cafetero: enero - semana 46 2026)
+    datos_mongo.py       #   UNA corrida deja todo: el año simulado (enero - semana 46 de 2026) y la
+                         #   semana de la sustentación (W47 pagada, W48 por pagar y planeada, W49 programada)
     app/                 #   database.py, schemas.py, routers/, reglas/
   front/                 # Streamlit: app.py, pages/, assets/, .streamlit/config.toml
   fotos/                 # imágenes subidas por la app (ruta guardada en el documento)
@@ -44,7 +45,7 @@ Desde la raíz del repo, con un `.env` creado a partir de `.env.example`:
 
 ```bash
 pip install -r requirements.txt
-python back/datos_mongo.py          # crea las colecciones y deja la base con el año simulado
+python back/datos_mongo.py --confirmar   # crea las colecciones y deja TODOS los datos (sin --confirmar: solo muestra el plan)
 uvicorn back.main:app --reload      # API en http://localhost:8000, Swagger en /docs
 streamlit run front/app.py          # app en http://localhost:8501
 ```

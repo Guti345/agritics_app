@@ -28,8 +28,8 @@ t1, t2, t3 = st.columns(3)
 t1.metric("Total a pagar", ui.pesos(r3["total_a_pagar"]), border=True,
           help="Labores completadas del periodo; en contratos, lo pactado menos los anticipos")
 t2.metric("Nómina pagada", ui.pesos(r3["nomina_pagada"]), border=True,
-          help="Lo efectivamente pagado en los cortes de nómina hechos dentro del periodo (puede incluir labores "
-               "de días anteriores que se pagaron en esos cortes)")
+          help="Lo efectivamente pagado en los pagos de nómina hechos dentro del periodo (puede incluir labores "
+               "de días anteriores que se pagaron en esos pagos)")
 pct = r3["pct_gastos_nomina"]
 t3.metric("% de los gastos que es nómina", "—" if pct is None else f"{ui.numero(pct, 1)} %", border=True,
           help="Nómina causada del periodo / gastos totales del periodo (flujo de caja)"
@@ -44,11 +44,11 @@ if not filas:
 st.subheader("Lista para pagar")
 ui.tabla(pd.DataFrame([{
     "Trabajador": t["nombre"], "Tipo": t["tipo"].capitalize(), "Jornales": t["jornales"],
-    "Total a pagar": t["total_a_pagar"], "Pagado en cortes": t["pagado_en_cortes"],
+    "Total a pagar": t["total_a_pagar"], "Ya pagado": t["pagado_en_cortes"],
     "Pendiente por pagar": t["pendiente_por_pagar"], "Estimado abiertas": t["estimado_abiertas"],
     "Anticipos recibidos": t["total_anticipos_recibidos"], "Kg recolectados": t["kg_recolectados"],
     "Costo por kg": t["costo_por_kg"],
-} for t in filas]), dinero=["Total a pagar", "Pagado en cortes", "Pendiente por pagar", "Estimado abiertas",
+} for t in filas]), dinero=["Total a pagar", "Ya pagado", "Pendiente por pagar", "Estimado abiertas",
                             "Anticipos recibidos", "Costo por kg"], kilos=["Kg recolectados"], cifras=["Jornales"])
 st.caption(f"Tipo de trabajador: {r3['criterio_tipo']}. «Estimado abiertas» no entra al pago hasta completarlas.")
 
@@ -108,7 +108,7 @@ dias = ui.dias_de(semana)
 hoy = ui.hoy()
 celdas: dict[tuple[str, str], list[str]] = {}
 for t, l in visibles:
-    detalle = f"{l['forma_pago']} · {ui.pesos(l['tarifa'])} · {l['estado']}"
+    detalle = f"{l['forma_pago']} · {ui.pesos(l['tarifa'])} · {ui.sin_corte(l['estado'])}"
     celdas.setdefault((t["trabajador_id"], str(l["fecha"])[:10]), []).append(
         ui.chip_real(f"{l['labor']} · {l['lote']}", l["completada"], detalle))
 con_labores = [t for t in filas if any((t["trabajador_id"], d.isoformat()) in celdas for d in dias)]
@@ -132,7 +132,7 @@ else:
             f"<tbody>{cuerpo}</tbody></table></div>")
 st.caption(f"{en_semana} labores en esta semana"
            + (f" ({len(visibles)} en todo el periodo)" if len(semanas) > 1 else "")
-           + ". Cada una dice su forma de pago, la tarifa y en qué corte se pagó.")
+           + ". Cada una dice su forma de pago, la tarifa y en qué pago de nómina se pagó.")
 
 with st.expander("Ver las labores del periodo (tabla)"):
     if not visibles:
@@ -141,5 +141,5 @@ with st.expander("Ver las labores del periodo (tabla)"):
         ui.tabla(pd.DataFrame([{
             "Día": ui.dia_corto(ui.a_fecha(l["fecha"])), "Trabajador": t["nombre"], "Lote": l["lote"],
             "Labor": l["labor"], "Forma de pago": l["forma_pago"], "Jornales": l["jornales"], "Tarifa": l["tarifa"],
-            "A pagar": l["a_pagar"], "Estado": l["estado"]} for t, l in sorted(visibles, key=lambda x: x[1]["fecha"])]),
+            "A pagar": l["a_pagar"], "Estado": ui.sin_corte(l["estado"])} for t, l in sorted(visibles, key=lambda x: x[1]["fecha"])]),
             dinero=["Tarifa", "A pagar"], cifras=["Jornales"])

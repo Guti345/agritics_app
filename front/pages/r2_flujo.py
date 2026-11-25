@@ -1,5 +1,5 @@
-"""R2 · Flujo de caja (solo lectura). El capital (aportes, retiros y ajustes) va SIEMPRE
-aparte: nunca entra al margen."""
+"""R2 · Flujo de caja (solo lectura). El capital y la deuda (aportes, retiros, ajustes,
+préstamos recibidos, abonos a deuda y pago de intereses) van SIEMPRE aparte: nunca entran al margen."""
 
 from datetime import date
 
@@ -11,7 +11,7 @@ import api
 import graficos as g
 import ui
 
-TIPOS = {"ingreso": "Ingreso", "egreso": "Egreso", "capital": "Capital"}
+TIPOS = {"ingreso": "Ingreso", "egreso": "Egreso", "capital": "Capital y deuda"}
 
 st.title("Flujo de caja")
 hoy = ui.hoy()
@@ -35,9 +35,15 @@ m2.metric(f"Margen de la finca ({operativo} operativo)", ui.pesos(total["margen"
           help=f"Lo que deja la finca en el rango: ingresos − gastos ({ui.pesos(ingresos_rango)} − "
                f"{ui.pesos(total['gastos']['total'])}). Margen operativo = margen / ingresos. "
                "El capital no entra al margen.")
-m3.metric("Capital neto (aparte)", ui.pesos(total["capital"]["neto"]), border=True,
-          help=f"Aportes {ui.pesos(total['capital']['aportes'])}, retiros {ui.pesos(total['capital']['retiros'])}, "
-               f"ajustes {ui.pesos(total['capital']['ajustes'])}")
+# Capital y deuda, desglosados por tipo (los que salen de caja, con signo menos).
+cap = total["capital"]
+desglose = [("Aportes de capital", cap["aportes"]), ("Retiros", -cap["retiros"]), ("Ajustes", cap["ajustes"]),
+            ("Préstamos recibidos", cap.get("prestamos", 0)), ("Abonos a deuda", -cap.get("abonos_deuda", 0)),
+            ("Pago de intereses", -cap.get("intereses", 0))]
+with m3:
+    st.html("<div class='ag-cifra ag-capital'><small>Capital y deuda (aparte del margen)</small>"
+            f"<div>{ui.pesos(cap['neto'])}</div>"
+            + "".join(f"<p><span>{n}</span><span>{ui.pesos(v)}</span></p>" for n, v in desglose) + "</div>")
 m4.metric("Saldo final", ui.pesos(r2["saldo_final"]), border=True)
 
 # ── (a) ingresos vs. gastos por semana, margen y capital aparte ──
@@ -55,13 +61,14 @@ if semanas:
     fig.add_scatter(x=x, y=[s["margen"] for s in semanas], name="Margen (ingresos − gastos)", mode="lines+markers",
                     line=dict(color=g.TINTA, width=2), marker=dict(size=8),
                     hovertemplate="Margen $%{y:,.0f}")
-    fig.add_scatter(x=x, y=[s["capital"]["neto"] for s in semanas], name="Capital: aportes, retiros y ajustes (aparte)",
+    fig.add_scatter(x=x, y=[s["capital"]["neto"] for s in semanas], name="Capital y deuda (aparte)",
                     mode="lines+markers", line=dict(color=g.SERIES[3], width=2, dash="dash"),
                     marker=dict(size=8, symbol="diamond"), hovertemplate="Capital $%{y:,.0f}")
     fig.update_layout(barmode="group")
     fig.update_yaxes(tickformat="$,.0f")   # -$5.000.000 (signo antes del $)
     g.mostrar(g.tema(fig, alto=430, titulo_y="COP por semana"), key="r2_semanas")
-    st.caption("El capital va en su propia línea: los aportes de la familia no son ingresos y nunca suman al margen.")
+    st.caption("El capital y la deuda van en su propia línea: aportes y préstamos no son ingresos, y retiros, abonos "
+               "e intereses no son gastos de la finca; nunca suman al margen.")
 
 # ── (b) flujo en formato largo ──
 st.subheader("Flujo de caja detallado")
@@ -75,7 +82,8 @@ if vista == "Día":
         ui.sin_datos("Sin movimientos de caja en el rango.")
     else:
         filas = [{"Fecha": ui.fecha_corta(ui.a_fecha(l["fecha"])), "Tipo": TIPOS.get(l["tipo"], l["tipo"]),
-                  "Categoría": l["categoria"].replace("_", " ").capitalize(), "Descripción": l["descripcion"],
+                  "Categoría": ui.MOVIMIENTOS_CAJA.get(l["categoria"], l["categoria"].replace("_", " ").capitalize()),
+                  "Descripción": l["descripcion"],
                   "Valor": l["valor"], "Saldo": l["saldo"]} for l in detalle]
         ingresos = sum(l["valor"] for l in detalle if l["tipo"] == "ingreso")
         egresos = sum(l["valor"] for l in detalle if l["tipo"] == "egreso")
@@ -84,7 +92,7 @@ if vista == "Día":
                   {"Fecha": "TOTAL", "Tipo": "Egresos", "Categoría": "", "Descripción": "", "Valor": egresos, "Saldo": None},
                   {"Fecha": "TOTAL", "Tipo": "Margen", "Categoría": "", "Descripción": "ingresos − egresos",
                    "Valor": ingresos + egresos, "Saldo": None},
-                  {"Fecha": "TOTAL", "Tipo": "Capital", "Categoría": "", "Descripción": "aparte del margen",
+                  {"Fecha": "TOTAL", "Tipo": "Capital y deuda", "Categoría": "", "Descripción": "aparte del margen",
                    "Valor": capital, "Saldo": r2["saldo_final"]}]
         ui.tabla(pd.DataFrame(filas), dinero=["Valor", "Saldo"], height=520)
         st.caption(f"{len(detalle)} movimientos. Cada línea muestra el saldo de caja después de ese movimiento.")
@@ -105,7 +113,7 @@ else:
             "Servicios": gastos["servicios"], "Transporte": gastos["transporte"], "Casa": gastos["casa"],
             "Otros": gastos["otros"], "Nómina por fuera": gastos["nomina_registrada_como_gasto"],
             "Gastos": gastos["total"],
-            "Margen": p["margen"], "Capital (aparte)": p["capital"]["neto"], "Flujo neto": p["flujo_neto"],
+            "Margen": p["margen"], "Capital y deuda (aparte)": p["capital"]["neto"], "Flujo neto": p["flujo_neto"],
             "Saldo": r2["saldo_final"] if es_total else saldo,
         })
     if not any(f["Nómina por fuera"] for f in filas):      # columna solo si hubo pagos de nómina como gasto
@@ -113,4 +121,4 @@ else:
             del f["Nómina por fuera"]
     columnas = [c for c in filas[0] if c != "Periodo"]
     ui.tabla(pd.DataFrame(filas), dinero=columnas, height=520)
-    st.caption("Saldo = saldo inicial + flujo neto acumulado (margen + capital).")
+    st.caption("Saldo = saldo inicial + flujo neto acumulado (margen + capital y deuda).")
