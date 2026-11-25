@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from back.app.auth import SUPERUSUARIO, hashear_clave
-from back.app.reglas.mensajes import USUARIO_REPETIDO
+from back.app.reglas.mensajes import AUTO_INACTIVAR, ULTIMO_SUPERUSUARIO, USUARIO_REPETIDO
 from back.app.database import USUARIOS, get_db
 from back.app.reglas.catalogos import exigir_nombre_libre
 from back.app.reglas.errores import conflicto
@@ -48,10 +48,17 @@ async def corregir_usuario(
     db: AsyncIOMotorDatabase = Depends(get_db),
     yo: dict = Depends(SUPERUSUARIO),
 ):
+    """Los usuarios nunca se borran (no hay DELETE): se inactivan. Solo cambian `activo` y
+    `clave` (el rol no se cambia por aquí). Guardas (409): siempre debe quedar al menos un
+    superusuario activo -lo intente quien lo intente- y nadie se inactiva a sí mismo."""
     doc = await buscar_o_404(db[USUARIOS], id, "el usuario")
     datos = cambios.model_dump(exclude_unset=True)
+    if datos.get("activo") is False and doc.get("activo") and doc["rol"] == Rol.superusuario.value:
+        activos = await db[USUARIOS].count_documents({"rol": Rol.superusuario.value, "activo": True})
+        if activos <= 1:
+            raise conflicto(ULTIMO_SUPERUSUARIO)
     if datos.get("activo") is False and doc["_id"] == yo["_id"]:
-        raise conflicto("No puede inactivar su propio usuario")
+        raise conflicto(AUTO_INACTIVAR)
     transformar = (lambda nuevo: {**nuevo, "clave": hashear_clave(nuevo["clave"])}) if "clave" in datos else None
     actualizado = await corregir(
         db, USUARIOS, doc, UsuarioCreate, datos, yo,

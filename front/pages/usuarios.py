@@ -1,5 +1,7 @@
-"""Superusuario: usuarios de la app. Crear, activar o inactivar y cambiar la clave.
-La API nunca devuelve la clave."""
+"""Superusuario: usuarios de la app. Crear, inactivar o reactivar y cambiar la clave.
+Los usuarios NUNCA se borran: se inactivan (no pueden entrar) y se pueden reactivar. Inactivar
+pide confirmación; la API no deja inactivar al último superusuario activo ni a uno mismo (409,
+con su mensaje tal cual). La API nunca devuelve la clave."""
 
 from html import escape
 
@@ -11,12 +13,26 @@ import ui
 ROLES = {"administrador": "Administrador", "mayordomo": "Mayordomo", "junta": "Junta familiar",
          "superusuario": "Superusuario"}
 
+@st.dialog("Inactivar usuario")
+def confirmar_inactivar(u: dict) -> None:
+    """Confirmación explícita: inactivar no debe pasar por un clic accidental."""
+    st.markdown(f"¿Inactivar a **{escape(u['nombre'])}** (usuario `{u['usuario']}`, {ROLES.get(u['rol'], u['rol'])})?")
+    st.caption("No podrá entrar a la app hasta que lo reactives. No se borra nada: sus registros siguen ahí.")
+    si, no = st.columns(2)
+    if si.button("Sí, inactivar", type="primary", icon=":material/person_off:", width="stretch", key="dlg_si"):
+        ui.enviar(lambda: api.patch(f"/usuarios/{u['id']}", {"activo": False}),
+                  exito=f"Registro guardado: {u['usuario']} quedó inactivo")
+    if no.button("Cancelar", width="stretch", key="dlg_no"):
+        st.rerun()
+
+
 st.title("Usuarios")
 usuarios = ui.leer(lambda: api.get("/usuarios"))
 yo = st.session_state["usuario"]["usuario"]
 avisos = st.container()   # errores de los botones de cada fila, arriba de la lista
 
-st.caption(f"{sum(u['activo'] for u in usuarios)} activos de {len(usuarios)}. Un usuario inactivo no puede entrar.")
+st.caption(f"{sum(u['activo'] for u in usuarios)} activos de {len(usuarios)}. Un usuario inactivo no puede entrar; "
+           "los usuarios no se borran, se inactivan. Siempre queda al menos un superusuario activo.")
 for u in usuarios:
     with st.container(border=True):
         a, b, c, d = st.columns([2.5, 1.5, 1.5, 1.3], vertical_alignment="center")
@@ -27,11 +43,10 @@ for u in usuarios:
                f"{'Activo' if u['activo'] else 'Inactivo'}</span>")
         if u["activo"]:
             if d.button("Inactivar", key=f"inact_{u['id']}", icon=":material/person_off:", width="stretch"):
-                ui.enviar(lambda: api.patch(f"/usuarios/{u['id']}", {"activo": False}), donde=avisos,
-                          exito=f"Registro guardado: {u['usuario']} quedó inactivo")
-        elif d.button("Activar", key=f"act_{u['id']}", type="primary", icon=":material/person_check:", width="stretch"):
+                confirmar_inactivar(u)
+        elif d.button("Reactivar", key=f"act_{u['id']}", type="primary", icon=":material/person_check:", width="stretch"):
             ui.enviar(lambda: api.patch(f"/usuarios/{u['id']}", {"activo": True}), donde=avisos,
-                      exito=f"Registro guardado: {u['usuario']} quedó activo")
+                      exito=f"Registro guardado: {u['usuario']} quedó activo de nuevo")
 
 c1, c2 = st.columns(2)
 with c1:

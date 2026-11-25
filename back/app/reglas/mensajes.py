@@ -24,6 +24,11 @@ TRABAJADOR_REPETIDO = "Ya hay un trabajador con ese documento"
 RECIBO_REPETIDO = "Ya hay un recibo con ese comprobante"
 
 
+# ── Usuarios: nunca se borran, solo se inactivan ──
+AUTO_INACTIVAR = "No puede inactivar su propio usuario"
+ULTIMO_SUPERUSUARIO = "Debe quedar al menos un usuario superusuario activo: es quien crea y define los accesos"
+
+
 # ── Lectura de lluvia repetida a la misma hora (API + índice único fecha_hora) ──
 def lectura_lluvia_repetida(hora: datetime, dia: date) -> str:
     return f"Ya hay una lectura de lluvia a las {hora:%H:%M} del {dia:%Y-%m-%d}"
