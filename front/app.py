@@ -33,38 +33,49 @@ REPORTES = [
     ("pages/r2_flujo.py", "Flujo de caja (R2)", ":material/account_balance_wallet:"),
     ("pages/r3_nomina.py", "Nómina y labores (R3)", ":material/badge:"),
 ]
+ADMINISTRADOR = {
+    "": [("pages/inicio_admin.py", "Inicio", ":material/home:")],   # su pantalla inicial, sin título de sección
+    "La semana": [
+        ("pages/tablero_semana.py", "Tablero de la semana", ":material/calendar_view_week:"),
+        ("pages/cortes.py", "Pagar nómina", ":material/payments:"),
+    ],
+    "Libro contable": [
+        ("pages/libro.py", "Ventas, compras y gastos", ":material/receipt_long:"),
+        ("pages/caja.py", "Caja", ":material/wallet:"),
+    ],
+    # El administrador también puede escribir lo de campo (la API lo deja: ADMIN_O_MAYORDOMO).
+    "Campo": CAMPO,
+    "Reportes": [
+        *REPORTES,
+        ("pages/tablero_kpis.py", "Resultados de la junta", ":material/monitoring:"),
+    ],
+    "Administración": [
+        ("pages/catalogos.py", "Catálogos", ":material/list_alt:"),
+        ("pages/trazabilidad.py", "Trazabilidad y Excel", ":material/history:"),
+    ],
+}
 PANTALLAS = {
     "mayordomo": MAYORDOMO,                    # sin reportes
-    "administrador": {
-        "": [("pages/inicio_admin.py", "Inicio", ":material/home:")],   # su pantalla inicial, sin título de sección
-        "La semana": [
-            ("pages/tablero_semana.py", "Tablero de la semana", ":material/calendar_view_week:"),
-            ("pages/cortes.py", "Pagar nómina", ":material/payments:"),
-        ],
-        "Libro contable": [
-            ("pages/libro.py", "Ventas, compras y gastos", ":material/receipt_long:"),
-            ("pages/caja.py", "Caja", ":material/wallet:"),
-        ],
-        # El administrador también puede escribir lo de campo (la API lo deja: ADMIN_O_MAYORDOMO).
-        "Campo": CAMPO,
-        "Reportes": [
-            *REPORTES,
-            ("pages/tablero_kpis.py", "Resultados de la junta", ":material/monitoring:"),
-        ],
-        "Administración": [
-            ("pages/catalogos.py", "Catálogos", ":material/list_alt:"),
-            ("pages/trazabilidad.py", "Trazabilidad y Excel", ":material/history:"),
-        ],
-    },
+    "administrador": ADMINISTRADOR,
     # Junta: todo solo lectura (estas pantallas no tienen formularios).
     "junta": [
         ("pages/tablero_kpis.py", "Resultados del periodo", ":material/monitoring:"),
         *REPORTES,
     ],
-    "superusuario": [
-        ("pages/usuarios.py", "Usuarios", ":material/group:"),
-        ("pages/auditoria.py", "Auditoría", ":material/history:"),
-    ],
+    # Superusuario: lo de la junta (cae en Resultados del periodo), los catálogos y lo del sistema.
+    "superusuario": {
+        "Reportes": [
+            ("pages/tablero_kpis.py", "Resultados del periodo", ":material/monitoring:"),
+            *REPORTES,
+        ],
+        "Administración": [
+            ("pages/catalogos.py", "Catálogos", ":material/list_alt:"),
+        ],
+        "Sistema": [
+            ("pages/usuarios.py", "Usuarios", ":material/group:"),
+            ("pages/auditoria.py", "Auditoría", ":material/history:"),
+        ],
+    },
 }
 
 
