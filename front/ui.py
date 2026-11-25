@@ -62,6 +62,31 @@ table.ag-cal td.hoy {background: #FFF4E8;}
 .ag-chip.real.completada {background: #004846; color: #FFF4E8; border: 2px solid #004846;}
 .ag-leyenda {display: flex; flex-wrap: wrap; gap: .5rem; font-size: 13px; margin: .2rem 0 .6rem;}
 .ag-leyenda .ag-chip {display: inline-block; margin: 0;}
+/* cronograma: vista día (un recuadro por lote) y vista mes (semanas x días, fichas compactas) */
+.ag-lotes {display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: .5rem;}
+.ag-mes {display: grid; grid-template-columns: 44px repeat(7, minmax(118px, 1fr)); gap: .35rem; overflow-x: auto;}
+.ag-mes .cab {font-weight: 700; font-size: 13px; padding: 0 .2rem;}
+.ag-mes .sem {font-weight: 700; font-size: 12px; opacity: .75; padding-top: .35rem;}
+.ag-mes .celda {background: #FFFFFF; border: 1px solid #EBE2DD; border-radius: 8px; padding: .3rem; min-height: 96px;}
+.ag-mes .celda.fuera {opacity: .45;}
+.ag-mes .celda.hoy {border: 2px solid #004846;}
+.ag-mes .num {font-weight: 700; font-size: 13px; margin-bottom: .1rem;}
+.ag-mini {display: block; border-radius: 5px; padding: .06rem .3rem; margin: .12rem 0; font-size: 11.5px; line-height: 1.25;}
+.ag-mini.planeada {border: 1.5px dashed #009C48; background: #FFFFFF;}
+.ag-mini.abierta {border: 1.5px solid #00C94B; background: #FFF4E8;}
+.ag-mini.completada {background: #004846; color: #FFF4E8; border: 1.5px solid #004846;}
+/* programación: quitar preasignación, grande y a la vista */
+.st-key-pg_quitar {background: #FFFFFF;}
+.st-key-pg_quitar button {min-height: 3.2rem; font-size: 1.05rem;}
+/* inicio del mayordomo: tarjetas de acceso */
+.ag-tarjeta {display: flex; gap: .9rem; align-items: center; min-height: 92px;}
+.ag-tarjeta img {flex: none; width: 52px; height: 52px; padding: 10px; border-radius: 14px; background: #FFF4E8;}
+.ag-tarjeta b {font-size: 22px; display: block; line-height: 1.2;}
+.ag-tarjeta small {font-size: 14px; opacity: .85;}
+[class*="st-key-tarjeta_"] {background: #FFFFFF; border-left: 6px solid #009C48 !important;}
+[class*="st-key-tarjeta_"] a[data-testid="stPageLink-NavLink"] {background: #004846; justify-content: center;
+  border-radius: 8px; padding: .55rem .8rem;}
+[class*="st-key-tarjeta_"] a[data-testid="stPageLink-NavLink"] * {color: #FFF4E8 !important; font-weight: 600;}
 .ag-cifra {background: #FFFFFF; border: 1px solid #EBE2DD; border-radius: 8px; padding: .8rem 1rem;}
 .ag-cifra div {font-size: 32px; font-weight: 700; line-height: 1.2;}
 .ag-cifra small {font-size: 14px; opacity: .85;}
@@ -242,10 +267,11 @@ def aviso_guardado() -> None:
 
 
 def enviar(accion: Callable[[], object], limpiar: Iterable[str] = (),
-           exito: str = "Registro guardado", refrescar: bool = False, donde=None):
+           exito: str | Callable[[object], str] = "Registro guardado", refrescar: bool = False, donde=None):
     """Ejecuta la escritura. Si la API la rechaza (409/422/...), st.error con su `detail` tal
     cual y NO se borra nada de lo digitado. Si sale bien, se limpian las claves `limpiar` de
     st.session_state (los campos del formulario), se deja el aviso y se recarga.
+    `exito`: el aviso, o una función que lo arma con lo que devolvió `accion`.
     `refrescar`: limpia el caché de listas (pool, trabajadores, labores) antes de recargar.
     `donde`: contenedor para el error (por defecto, donde se llama)."""
     try:
@@ -273,7 +299,7 @@ def enviar(accion: Callable[[], object], limpiar: Iterable[str] = (),
     st.session_state[_LIMPIAR] = pendientes
     if refrescar:
         api.refrescar_listas()
-    st.session_state[_AVISO] = exito
+    st.session_state[_AVISO] = exito(resultado) if callable(exito) else exito
     st.rerun()
     return resultado
 

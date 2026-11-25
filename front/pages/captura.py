@@ -11,6 +11,7 @@ from datetime import datetime, time
 import streamlit as st
 
 import api
+import campo
 import ui
 
 UNIDAD = {"kg": "kg", "hectareas": "ha", "jornales": "jornales", "racimos": "racimos", "ninguna": None}
@@ -33,7 +34,7 @@ st.title("Registro diario")
 labor_tab, lluvia_tab, platano_tab = st.tabs(
     [":material/agriculture: Registrar labor", ":material/rainy: Registrar lluvia",
      ":material/nutrition: Guardar cosecha de plátano"],
-    key="captura_acceso",
+    key="captura_acceso", on_change="rerun",   # al guardar se queda en la misma pestaña
 )
 
 # ═══ REGISTRAR LABOR ═══════════════════════════════════════════════════════════
@@ -43,23 +44,12 @@ with labor_tab:
     insumos = ui.leer(lambda: api.lista("/insumos"))
 
     # El catálogo de labores (las 14 estables de la finca) lo maneja solo el administrador,
-    # en Catálogos. Aquí el mayordomo solo puede crear trabajadores.
-    nuevo_trab, _ = st.columns(2)
-    with nuevo_trab.expander("+ Crear trabajador"):
-        with st.form("nuevo_trabajador", border=False):
-            nombre = st.text_input("Nombre", key="nt_nombre")
-            documento = st.text_input("Documento (opcional)", key="nt_documento")
-            telefono = st.text_input("Teléfono (opcional)", key="nt_telefono")
-            activar = st.checkbox("Activarlo en el pool de esta semana", value=True, key="nt_activar")
-            if st.form_submit_button("Crear trabajador", type="primary"):
-                def crear_trabajador():
-                    t = api.post("/trabajadores", {"nombre": nombre, "documento": documento.strip() or None,
-                                                   "telefono": telefono.strip() or None})
-                    if activar:
-                        api.post("/pool/activar", {"trabajador_id": t["id"], "semana": ui.semana_iso()})
-                    return t
-                ui.enviar(crear_trabajador, limpiar=["nt_nombre", "nt_documento", "nt_telefono"],
-                          exito=f"Trabajador creado: {nombre.strip()}", refrescar=True)
+    # en Catálogos. El mayordomo crea trabajadores en su pantalla «Trabajadores»; el
+    # administrador conserva aquí el atajo.
+    if not ui.puede("mayordomo"):
+        nuevo_trab, _ = st.columns(2)
+        with nuevo_trab.expander("+ Crear trabajador"):
+            campo.form_trabajador()
 
     # Sin st.form: los campos dependen unos de otros (labor -> forma de pago -> meta).
     # Lo digitado vive en st.session_state (key=...) y solo se limpia al guardar.
@@ -69,8 +59,9 @@ with labor_tab:
     trabajador = c2.selectbox("Trabajador", list(pool), index=None, key="lab_trabajador",
                               placeholder="Elige del pool de la semana")
     if not pool:
+        donde = "Trabajadores › Pool de trabajadores" if ui.puede("mayordomo") else "Pool de trabajadores"
         st.warning(f"No hay trabajadores activos en la {ui.rotulo_semana(ui.semana_iso(fecha))}: "
-                   "actívalos en Pool de trabajadores.", icon=":material/group_off:")
+                   f"actívalos en {donde}.", icon=":material/group_off:")
 
     lote_nombre = c1.selectbox("Lote", [l["nombre"] for l in lotes], index=None, key="lab_lote",
                                placeholder="Elige el lote")

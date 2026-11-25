@@ -24,8 +24,11 @@ Calendario
 Lotes (área, variedad)                                                          [Dueño]
   - Portugal 2,40 ha Castillo | Oriente 1,60 Colombia | Villa Aurora 2,80 Castillo
   - Centro 0,60 Colombia | Madroño 1,55 Cenicafé | Minitas 2,50 Castillo | La Casa 2,40 Colombia
-  - Bloque Plátano (Baltimore) 6,50 ha | Bosque Natural 4,65 ha (no_productivo)
+  - Baltimore 6,50 ha (Plátano Hartón) | Bosque Natural 4,65 ha (no_productivo)
   - Café: 13,85 ha en 7 lotes.
+  - Polígonos (solo para el mapa) desde back/datos_finca.geojson (Google Earth Engine). El área
+    oficial es la del catálogo: Bosque Natural lleva el polígono derivado (perímetro menos los
+    lotes, ~6,65 ha con caminos y casa) como aproximación visual, pero sigue con 4,65 ha.
 Tarifas de nómina                                                               [Dueño]
   - Jornal $80.000-$130.000 según la labor (guadaña $125.000); ver TARIFA_JORNAL.
   - Jornales por labor: 1 (70 %), 0,5 (22 %), 1,5 (5 %), 2 (3 %).                  [Supuesto]
@@ -83,6 +86,7 @@ Usuarios: jaime (administrador), mayordomo, junta, antonio (superusuario); clave
 """
 
 import asyncio
+import json
 import math
 import random
 import struct
@@ -137,6 +141,15 @@ FOTO_PLUVIOMETRO = "fotos/placeholder_pluviometro.jpg"
 FOTO_COMPROBANTE = "fotos/placeholder_comprobante.jpg"
 PLACEHOLDERS = {FOTO_RECIBO: 232, FOTO_PLUVIOMETRO: 150, FOTO_COMPROBANTE: 200}  # nivel de gris
 
+# Polígonos de los lotes (properties.id del GeoJSON -> lote). El perímetro de la finca
+# (properties.tipo == "perimetro") no es un lote: no va a la base, el frontend lo lee del archivo.
+GEOJSON_FINCA = Path(__file__).resolve().parent / "datos_finca.geojson"
+POLIGONO_DE = {
+    "portugal_lote": "Portugal", "oriente_lote": "Oriente", "centro_lote": "Centro",
+    "villa_aurora_lote": "Villa Aurora", "madrono_lote": "Madroño", "minitas_lote": "Minitas",
+    "la_casa_lote": "La Casa", "baltimore": "Baltimore", "bosque_natural": "Bosque Natural",
+}
+
 LOTES = [  # nombre, área, cultivos, variedad, estado
     ("Portugal", 2.40, ["cafe"], "Castillo", "activo"),
     ("Oriente", 1.60, ["cafe"], "Colombia", "activo"),
@@ -145,7 +158,7 @@ LOTES = [  # nombre, área, cultivos, variedad, estado
     ("Madroño", 1.55, ["cafe"], "Cenicafé", "activo"),
     ("Minitas", 2.50, ["cafe"], "Castillo", "activo"),
     ("La Casa", 2.40, ["cafe"], "Colombia", "activo"),
-    ("Bloque Plátano", 6.50, ["platano"], "Baltimore", "activo"),
+    ("Baltimore", 6.50, ["platano"], "Plátano Hartón", "activo"),
     ("Bosque Natural", 4.65, ["bosque"], "Guadua y bosque natural", "no_productivo"),   # nunca recibe labores
 ]
 
@@ -286,6 +299,17 @@ def jpeg_gris(ancho: int, alto: int, nivel: int) -> bytes:
             + bytes(datos) + b"\xff\xd9")
 
 
+def poligonos_lotes() -> dict[str, dict]:
+    """Geometría GeoJSON de cada lote del seed, leída de back/datos_finca.geojson."""
+    datos = json.loads(GEOJSON_FINCA.read_text(encoding="utf-8"))
+    poligonos = {POLIGONO_DE[f["properties"]["id"]]: f["geometry"] for f in datos["features"]
+                 if f["properties"]["tipo"] == "lote"}
+    faltan = {nombre for nombre, *_ in LOTES} - poligonos.keys()
+    if faltan:
+        raise SystemExit(f"{GEOJSON_FINCA.name}: faltan polígonos para {sorted(faltan)}")
+    return poligonos
+
+
 # ═══════════════════════════ Generador ═══════════════════════════
 
 class Mundo:
@@ -334,12 +358,13 @@ class Mundo:
         alta = en(INICIO, 6, 0)
         cat = {"registrado_por": "jaime", "fecha_captura": alta}
         self.lotes = {}
+        poligonos = poligonos_lotes()
         for nombre, area, cultivos, variedad, estado in LOTES:
             d = self.agregar(db.LOTES, LoteCreate(nombre=nombre, area_ha=area, cultivos=cultivos, variedad=variedad,
-                                                  estado=estado).a_mongo(), **cat)
+                                                  estado=estado, poligono=poligonos[nombre]).a_mongo(), **cat)
             self.lotes[nombre] = d
         self.lotes_cafe = [l for l in self.lotes.values() if "cafe" in l["cultivos"] and l["estado"] == "activo"]
-        self.lote_platano = self.lotes["Bloque Plátano"]
+        self.lote_platano = self.lotes["Baltimore"]
         self.labores = {}
         for nombre, cultivos, unidad, contrato, meta in LABORES:
             self.labores[nombre] = self.agregar(db.LABORES, LaborCreate(

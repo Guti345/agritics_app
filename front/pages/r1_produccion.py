@@ -8,6 +8,7 @@ import streamlit as st
 
 import api
 import graficos as g
+import mapa
 import ui
 
 st.title("Producción")
@@ -114,12 +115,15 @@ with cafe_tab:
         geo = {"type": "FeatureCollection", "features": [
             {"type": "Feature", "id": l["id"], "properties": {"nombre": l["nombre"]}, "geometry": l["poligono"]}
             for l in lotes_con_mapa]}
-        mapa = px.choropleth_map(
+        fig_mapa = px.choropleth_map(
             pd.DataFrame([{"id": l["id"], "Lote": l["nombre"], "kg/ha del año": kg_por_id.get(l["id"], 0)}
                           for l in lotes_con_mapa]),
             geojson=geo, locations="id", color="kg/ha del año", hover_name="Lote",
-            color_continuous_scale=["#EBE2DD", "#009C48", "#004846"], zoom=14, map_style="carto-positron")
-        g.mostrar(g.tema(mapa, alto=420), key="r1_mapa")
+            color_continuous_scale=["#EBE2DD", "#009C48", "#004846"], map_style="carto-positron",
+            **dict(zip(("center", "zoom"), mapa.encuadre(
+                [p[0] for l in lotes_con_mapa for pz in mapa.piezas(l["poligono"]) for p in pz[0]],
+                [p[1] for l in lotes_con_mapa for pz in mapa.piezas(l["poligono"]) for p in pz[0]], ancho=900, alto=420))))
+        g.mostrar(g.tema(fig_mapa, alto=420), key="r1_mapa")
     if por_lote:
         tabla = pd.DataFrame([{
             "Lote": p["lote"], "Área (ha)": p["area_ha"], "Kg en el rango": p["kg"], "Kg/ha en el rango": p["kg_ha"],
