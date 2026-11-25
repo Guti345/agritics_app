@@ -82,6 +82,21 @@ def semana_vigente(semana: str) -> tuple[date, date]:
     return lunes, min(domingo, hoy())
 
 
+def semanas_del_rango(desde: date, hasta: date) -> list[str]:
+    """Semanas ISO que tocan el rango (sumando días a fechas reales, nunca al número)."""
+    lunes, semanas = desde - timedelta(days=desde.weekday()), []
+    while lunes <= hasta:
+        semanas.append(semana_iso(lunes))
+        lunes += timedelta(days=7)
+    return semanas
+
+
+def _momentos(desde: date, hasta: date) -> dict:
+    """Filtro de un campo fecha-hora (p. ej. la fecha de un corte) por días de Colombia."""
+    return {"$gte": datetime(desde.year, desde.month, desde.day, tzinfo=BOGOTA),
+            "$lt": datetime(hasta.year, hasta.month, hasta.day, tzinfo=BOGOTA) + timedelta(days=1)}
+
+
 async def ids_recoleccion_cafe(db: AsyncIOMotorDatabase) -> list[ObjectId]:
     return [d["_id"] async for d in db[LABORES].find({"unidad_avance": "kg", "cultivos": "cafe"}, {"_id": 1})]
 
@@ -296,8 +311,21 @@ def _tipo(semanas: set, ultimas: set) -> tuple[str, int]:
     return ("recurrente" if recientes >= MIN_RECURRENTE else "esporádico"), recientes
 
 
-async def r3_nomina(db: AsyncIOMotorDatabase, semana: str, trabajador_id: ObjectId | None = None) -> dict:
-    lunes, domingo = rango_semana(semana)
+async def r3_nomina(db: AsyncIOMotorDatabase, semana: str | None, trabajador_id: ObjectId | None = None,
+                    desde: date | None = None, hasta: date | None = None) -> dict:
+    """Por semana ISO (`semana`) o, si `semana` es None, por rango de fechas (desde/hasta;
+    sin ellas, del 1 de enero a hoy). En modo rango: las labores y los agregados cubren todo
+    el rango, el pool cuenta en las semanas que tocan el rango, los cortes (y sus anticipos)
+    por su fecha dentro del rango, y se agrega el resumen `nomina_pagada` (lo pagado en esos
+    cortes) y `pct_gastos_nomina` (nómina causada / gastos totales del rango, R2)."""
+    if semana is not None:
+        lunes, domingo = rango_semana(semana)
+        del_pool = {"semana": semana}
+        de_los_cortes = {"semana": semana}
+    else:
+        lunes, domingo = rango_por_defecto(desde, hasta)
+        del_pool = {"semana": {"$in": semanas_del_rango(lunes, domingo)}}
+        de_los_cortes = {"fecha": _momentos(lunes, domingo)}
     del_trabajador = {"trabajador_id": trabajador_id} if trabajador_id else {}
     recoleccion = await ids_recoleccion_cafe(db)
     labores = await db[LABOR_DIARIA].aggregate([
@@ -315,17 +343,19 @@ async def r3_nomina(db: AsyncIOMotorDatabase, semana: str, trabajador_id: Object
         {"$sort": {"fecha": 1, "fecha_captura": 1}},
     ]).to_list(None)
 
-    en_pool = [p["trabajador_id"] async for p in db[POOL_SEMANA].find({"semana": semana, "activo": True, **del_trabajador})]
+    en_pool = [p["trabajador_id"] async for p in db[POOL_SEMANA].find({**del_pool, "activo": True, **del_trabajador})]
     ids = list({*(l["trabajador_id"] for l in labores), *en_pool})
     nombres = await _nombres(db, TRABAJADORES, ids)
     causada = {t["trabajador_id"]: t["total"] for t in await nomina(db, lunes, domingo)}
-    anticipos = {}
-    async for c in db[CIERRES].find({"semana": semana}).sort("corte", 1):
+    anticipos, cortes = {}, []
+    async for c in db[CIERRES].find(de_los_cortes).sort([("fecha", 1), ("corte", 1)]):
+        cortes.append(c)
         for a in c.get("anticipos", []):
             anticipos.setdefault(a["trabajador_id"], []).append(
                 {"corte": c["corte"], "labor_diaria_id": a["labor_diaria_id"], "valor": a["valor"], "fecha": c["fecha"]})
-    activas = await _semanas_activas(db, ids, semana)
-    ultimas = {semana_iso(lunes - timedelta(weeks=i)) for i in range(VENTANA_TIPO)}
+    referencia = semana or semana_iso(domingo)            # el tipo se mide hasta la semana consultada
+    activas = await _semanas_activas(db, ids, referencia)
+    ultimas = {semana_iso(rango_semana(referencia)[0] - timedelta(weeks=i)) for i in range(VENTANA_TIPO)}
 
     trabajadores = []
     for tid in ids:
@@ -371,10 +401,31 @@ async def r3_nomina(db: AsyncIOMotorDatabase, semana: str, trabajador_id: Object
             "nomina_causada": causada.get(str(tid), 0),
         })
     trabajadores.sort(key=lambda t: t["nombre"].lower())
-    return {"semana": semana, "desde": lunes, "hasta": domingo, "criterio_tipo": CRITERIO_TIPO,
-            "trabajadores": trabajadores, "total_a_pagar": sum(t["total_a_pagar"] for t in trabajadores),
-            "total_anticipos_recibidos": sum(t["total_anticipos_recibidos"] for t in trabajadores),
-            "total_nomina_causada": sum(t["nomina_causada"] for t in trabajadores)}
+    resultado = {"semana": semana, "desde": lunes, "hasta": domingo, "criterio_tipo": CRITERIO_TIPO,
+                 "trabajadores": trabajadores, "total_a_pagar": sum(t["total_a_pagar"] for t in trabajadores),
+                 "total_anticipos_recibidos": sum(t["total_anticipos_recibidos"] for t in trabajadores),
+                 "total_nomina_causada": sum(t["nomina_causada"] for t in trabajadores)}
+    if semana is None:
+        resultado["nomina_pagada"] = await _pagado_en_cortes(db, cortes, trabajador_id)
+        gastos = (await r2_flujo_caja(db, lunes, domingo, detalle=False))["total"]["gastos"]["total"]
+        resultado["pct_gastos_nomina"] = 100 * resultado["total_nomina_causada"] / gastos if gastos else None
+    return resultado
+
+
+async def _pagado_en_cortes(db: AsyncIOMotorDatabase, cortes: list[dict], trabajador_id: ObjectId | None) -> float:
+    """Lo efectivamente pagado en esos cortes: las labores que cada corte marcó (jornal:
+    pactado; contrato: pactado - anticipos ya adelantados) + los anticipos pagados en él."""
+    if not cortes:
+        return 0
+    del_trabajador = {"trabajador_id": trabajador_id} if trabajador_id else {}
+    r = await db[LABOR_DIARIA].aggregate([
+        {"$match": {"$or": [{"corte_semana": c["semana"], "corte": c["corte"]} for c in cortes], **del_trabajador}},
+        {"$group": {"_id": None, "valor": {"$sum": {"$subtract": [
+            PACTADO, {"$cond": [{"$eq": ["$forma_pago", "contrato"]}, ANTICIPOS_TOTAL, 0]}]}}}},
+    ]).to_list(1)
+    adelantado = sum(a["valor"] for c in cortes for a in c.get("anticipos", [])
+                     if trabajador_id is None or a["trabajador_id"] == trabajador_id)
+    return (r[0]["valor"] if r else 0) + adelantado
 
 
 # ═══════════════════════════ KPIs ═══════════════════════════
@@ -410,33 +461,76 @@ async def adopcion_digital(db: AsyncIOMotorDatabase, desde: date, hasta: date) -
             "porcentaje": 100 * mismo_total / n_total if n_total else None, "por_coleccion": por_coleccion}
 
 
-async def kpis(db: AsyncIOMotorDatabase, semana: str) -> dict:
-    lunes, hasta = semana_vigente(semana)
-    flujo_semana = await r2_flujo_caja(db, lunes, hasta, detalle=False)
-    inicio_anio = date(hasta.year, 1, 1)
-    flujo_anio = await r2_flujo_caja(db, inicio_anio, hasta, detalle=False)
-    produccion = await r1_produccion(db, lunes, hasta)
+async def kpis(db: AsyncIOMotorDatabase, semana: str | None, desde: date | None = None, hasta: date | None = None,
+               lote_id: ObjectId | None = None) -> dict:
+    """KPIs de la semana ISO `semana` o, si `semana` es None, del rango desde/hasta.
+
+    Margen, ingresos, gastos, adopción "del periodo" y producción por lote van sobre la
+    semana (hasta hoy) o el rango. ROI y adopción del AÑO: siempre del 1 de enero del año de
+    `hasta` hasta `hasta`. `lote_id` limita la producción por lote (no el margen).
+
+    Solo en modo rango, por lote, valores ESTIMADOS (la finca vende el café por recibo a
+    nivel finca, no por lote):
+      * ingreso_estimado = ventas de café del rango repartidas por la participación del
+        lote en los kg de cereza recogidos en el rango (la suma de los lotes da lo vendido;
+        sin cosecha en el rango queda en 0) + kg de plátano del lote x precio promedio del kg
+        de plátano vendido en el rango (0 si no hubo ventas).
+      * costo_labores = valor pactado de las labores COMPLETADAS del lote con fecha en el
+        rango (el PACTADO de reglas/nomina.py: incluye lo que se pagó como anticipo).
+      * margen_estimado = ingreso_estimado - costo_labores.
+    """
+    rango = semana is None
+    ini, fin = rango_por_defecto(desde, hasta) if rango else semana_vigente(semana)
+    flujo = await r2_flujo_caja(db, ini, fin, detalle=False)
+    inicio_anio = date(fin.year, 1, 1)
+    flujo_anio = await r2_flujo_caja(db, inicio_anio, fin, detalle=False)
+    produccion = await r1_produccion(db, ini, fin)          # de toda la finca: el filtro de lote va abajo
     platano = {}
     for p in produccion["platano"]:
         t = platano.setdefault(p["lote_id"], {"kg": 0, "racimos": 0})
         t["kg"] += p["kg"]
         t["racimos"] += p["racimos"]
-    lotes = await db[LOTES].find().sort("nombre").to_list(None)
+    lotes = await db[LOTES].find({"_id": lote_id} if lote_id else {}).sort("nombre").to_list(None)
     cafe = {f["lote_id"]: f["kg"] for f in produccion["por_lote"]}
     margen_anio, gasto_anio = flujo_anio["total"]["margen"], flujo_anio["total"]["gastos"]["total"]
-    return {
+    filas = [{"lote_id": l["_id"], "lote": l["nombre"], "kg_cafe": cafe.get(l["_id"], 0),
+              "kg_platano": platano.get(l["_id"], {}).get("kg", 0),
+              "racimos": platano.get(l["_id"], {}).get("racimos", 0)} for l in lotes]
+    if rango:
+        await _estimados_por_lote(db, ini, fin, filas, flujo["total"]["ingresos"]["cafe"], produccion["finca"]["kg"])
+    resultado = {
         "semana": semana,
-        "ingresos_semana": flujo_semana["total"]["ingresos"]["total"],
-        "gastos_semana": flujo_semana["total"]["gastos"]["total"],
-        "margen_semana": flujo_semana["total"]["margen"],
-        "produccion_por_lote": [{"lote_id": l["_id"], "lote": l["nombre"], "kg_cafe": cafe.get(l["_id"], 0),
-                                 "kg_platano": platano.get(l["_id"], {}).get("kg", 0),
-                                 "racimos": platano.get(l["_id"], {}).get("racimos", 0)} for l in lotes],
-        "roi": {"anio": hasta.year, "desde": inicio_anio, "hasta": hasta, "margen_acumulado": margen_anio,
+        "ingresos_semana": flujo["total"]["ingresos"]["total"],
+        "gastos_semana": flujo["total"]["gastos"]["total"],
+        "margen_semana": flujo["total"]["margen"],
+        "produccion_por_lote": filas,
+        "roi": {"anio": fin.year, "desde": inicio_anio, "hasta": fin, "margen_acumulado": margen_anio,
                 "gasto_acumulado": gasto_anio, "roi": margen_anio / gasto_anio if gasto_anio else None},
-        "adopcion_semana": await adopcion_digital(db, lunes, hasta),
-        "adopcion_anio": await adopcion_digital(db, inicio_anio, hasta),
+        "adopcion_semana": await adopcion_digital(db, ini, fin),
+        "adopcion_anio": await adopcion_digital(db, inicio_anio, fin),
     }
+    if rango:
+        resultado["desde"], resultado["hasta"] = ini, fin
+    return resultado
+
+
+async def _estimados_por_lote(db: AsyncIOMotorDatabase, desde: date, hasta: date, filas: list[dict],
+                              ventas_cafe: float, kg_cereza_finca: float) -> None:
+    """Agrega ingreso_estimado, costo_labores y margen_estimado a cada fila de lote (ver kpis)."""
+    vendido = await db[VENTA_PLATANO].aggregate([
+        {"$match": {"fecha": _rango(desde, hasta)}},
+        {"$group": {"_id": None, "valor": {"$sum": "$valor_total"}, "kg": {"$sum": "$kg"}}},
+    ]).to_list(1)
+    precio_platano = vendido[0]["valor"] / vendido[0]["kg"] if vendido and vendido[0]["kg"] else 0
+    costo = {c["_id"]: c["costo"] for c in await db[LABOR_DIARIA].aggregate([
+        {"$match": {"fecha": _rango(desde, hasta), "completada": True}},
+        {"$group": {"_id": "$lote_id", "costo": {"$sum": PACTADO}}},
+    ]).to_list(None)}
+    for f in filas:
+        cafe = ventas_cafe * f["kg_cafe"] / kg_cereza_finca if kg_cereza_finca else 0
+        f["ingreso_estimado"] = cafe + f["kg_platano"] * precio_platano
+        f["costo_labores"] = costo.get(f["lote_id"], 0)
+        f["margen_estimado"] = f["ingreso_estimado"] - f["costo_labores"]
 
 
 # ═══════════════════════════ Alertas ═══════════════════════════

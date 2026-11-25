@@ -3,10 +3,16 @@ alertas y cronograma). Solo salida: ningún reporte escribe en la base."""
 
 from datetime import date
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_serializer
 
 from .campos import FechaHoraOut, FechaOut, OidOut
 from .cortes import CuadresSemana
+
+
+def _solo_rango():
+    """Campo que solo existe en el modo rango (?desde=/?hasta=): en el modo semana no sale,
+    así la respuesta por semana queda exactamente como antes."""
+    return Field(default=None, exclude_if=lambda v: v is None)
 
 
 # ─── R1: producción ───
@@ -192,11 +198,15 @@ class TrabajadorNomina(BaseModel):
     kg_recolectados: float
     costo_por_kg: float | None = None
     rendimiento: RendimientoTrabajador
-    nomina_causada: float      # reglas/nomina.py: nomina(lunes, domingo)
+    nomina_causada: float      # reglas/nomina.py: nomina(desde, hasta)
 
 
 class R3NominaResponse(BaseModel):
-    semana: str
+    """Por semana (`semana` = "2026-W48") o por rango (`semana` = null; desde/hasta = el rango).
+    Solo en modo rango: `nomina_pagada` (lo pagado en los cortes cuya fecha cae en el rango) y
+    `pct_gastos_nomina` (nómina causada del rango / gastos totales del rango x 100; null si no
+    hubo gastos)."""
+    semana: str | None
     desde: date
     hasta: date
     criterio_tipo: str
@@ -204,6 +214,16 @@ class R3NominaResponse(BaseModel):
     total_a_pagar: float
     total_anticipos_recibidos: float
     total_nomina_causada: float
+    nomina_pagada: float | None = None
+    pct_gastos_nomina: float | None = None
+
+    @model_serializer(mode="wrap")
+    def _sin_resumen_de_rango_por_semana(self, serializar):
+        datos = serializar(self)
+        if self.semana is not None:          # modo semana: la respuesta de siempre
+            datos.pop("nomina_pagada", None)
+            datos.pop("pct_gastos_nomina", None)
+        return datos
 
 
 # ─── KPIs ───
@@ -217,11 +237,18 @@ class AdopcionDigital(BaseModel):
 
 
 class KpiLote(BaseModel):
+    """Producción del lote en el periodo. Solo en modo rango, valores ESTIMADOS (el café se
+    vende por recibo a nivel finca, no por lote): ingreso_estimado (ventas de café del rango
+    repartidas por los kg de cereza del lote + kg de plátano x precio promedio del rango),
+    costo_labores (valor pactado de sus labores completadas) y margen_estimado."""
     lote_id: OidOut
     lote: str
     kg_cafe: float
     kg_platano: float
     racimos: int
+    ingreso_estimado: float | None = _solo_rango()
+    costo_labores: float | None = _solo_rango()
+    margen_estimado: float | None = _solo_rango()
 
 
 class RoiSimple(BaseModel):
@@ -234,7 +261,12 @@ class RoiSimple(BaseModel):
 
 
 class KpisResponse(BaseModel):
-    semana: str
+    """Por semana (`semana` = "2026-W48") o por rango (`semana` = null, con desde/hasta). Los
+    campos *_semana y adopcion_semana son los del periodo consultado (semana o rango); ROI y
+    adopcion_anio van siempre del 1 de enero al último día del periodo."""
+    semana: str | None
+    desde: date | None = _solo_rango()
+    hasta: date | None = _solo_rango()
     ingresos_semana: float
     gastos_semana: float
     margen_semana: float
