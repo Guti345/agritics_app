@@ -8,6 +8,7 @@ Reglas de UX que se aplican desde aquí:
 - Dinero "$ 125.000", kilos con coma decimal solo si aplica, cifras alineadas a la derecha.
 """
 
+from base64 import b64encode
 from collections.abc import Callable, Iterable
 from datetime import date, datetime, time, timedelta, timezone
 from html import escape
@@ -137,6 +138,45 @@ def elegir_semana(rotulo: str = "Semana", key: str = "semana", donde=None,
     base = hoy()
     opciones = [semana_iso(base + timedelta(weeks=adelante - k)) for k in range(adelante + atras + 1)]
     return (donde or st).selectbox(rotulo, opciones, index=adelante, format_func=rotulo_semana, key=key)
+
+
+MESES_LARGOS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre",
+                "octubre", "noviembre", "diciembre"]
+PERIODOS = ["Semana", "Mes", "Año", "Rango de días"]
+
+
+def elegir_periodo(clave: str = "periodo", donde=None) -> tuple[date, date, str]:
+    """Filtro único de periodo: Semana / Mes / Año / Rango de días. Devuelve (desde, hasta,
+    rótulo); `hasta` nunca pasa de hoy. Deja en st.session_state[f"{clave}_modo"] el modo y,
+    en modo Semana, la semana ISO en st.session_state[f"{clave}_semana"]."""
+    hoy_ = hoy()
+    c1, c2, c3 = (donde or st).columns([2.3, 1.3, 1.3], vertical_alignment="bottom")
+    modo = c1.segmented_control("Periodo", PERIODOS, default="Semana", required=True, key=f"{clave}_modo")
+    if modo == "Semana":
+        semana = elegir_semana("Semana", key=f"{clave}_semana", donde=c2)
+        dias = dias_de(semana)
+        return dias[0], min(dias[-1], hoy_), rotulo_semana(semana)
+    if modo == "Mes":
+        meses, m = [], date(hoy_.year, hoy_.month, 1)
+        for _ in range(24):                                   # dos años hacia atrás
+            meses.append(m)
+            m = date(m.year - (m.month == 1), (m.month - 2) % 12 + 1, 1)
+        mes = c2.selectbox("Mes", meses, format_func=lambda m: f"{MESES_LARGOS[m.month - 1].capitalize()} {m.year}",
+                           key=f"{clave}_mes")
+        fin = date(mes.year + mes.month // 12, mes.month % 12 + 1, 1) - timedelta(days=1)
+        return mes, min(fin, hoy_), (f"{MESES_LARGOS[mes.month - 1]} de {mes.year}"
+                                     + (f" (hasta el {fecha_corta(hoy_)})" if fin > hoy_ else ""))
+    if modo == "Año":
+        anio = c2.selectbox("Año", [hoy_.year - k for k in range(3)], key=f"{clave}_anio")
+        fin = date(anio, 12, 31)
+        return date(anio, 1, 1), min(fin, hoy_), f"año {anio}" + (f" (hasta el {fecha_corta(hoy_)})" if fin > hoy_ else "")
+    desde = c2.date_input("Desde", value=date(hoy_.year, hoy_.month, 1), max_value=hoy_, format="DD/MM/YYYY",
+                          key=f"{clave}_desde")
+    hasta = c3.date_input("Hasta", value=hoy_, max_value=hoy_, format="DD/MM/YYYY", key=f"{clave}_hasta")
+    if desde > hasta:
+        st.error("La fecha «Desde» debe ser anterior a «Hasta»", icon=":material/error:")
+        st.stop()
+    return desde, hasta, f"del {fecha_corta(desde)} al {fecha_corta(hasta)}"
 
 
 def a_fecha(valor) -> date:
@@ -334,6 +374,15 @@ def boton_excel(semana: str, donde=None) -> None:
         "Descargar Excel", data=lambda: api.archivo(f"/reportes/consolidado-semanal/{semana}", quien),
         file_name=f"Agritics_consolidado_{semana}.xlsx", type="primary", icon=":material/download:",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key=f"excel_{semana}")
+
+
+def tarjeta(clave: str, ruta: str, titulo: str, texto: str, svg: str, icono: str, enlace: str | None = None) -> None:
+    """Tarjeta grande de acceso a una pantalla (ícono, título, una línea y botón). `svg`: el
+    ícono como texto SVG (va como <img>: st.html no deja pasar el SVG en línea)."""
+    imagen = f"<img alt='' src='data:image/svg+xml;base64,{b64encode(svg.encode()).decode()}'>"
+    with st.container(border=True, key=f"tarjeta_{clave}"):
+        st.html(f"<div class='ag-tarjeta'>{imagen}<div><b>{escape(titulo)}</b><small>{escape(texto)}</small></div></div>")
+        st.page_link(ruta, label=enlace or f"Abrir {titulo.lower()}", icon=icono, width="stretch")
 
 
 def cifra_grande(rotulo: str, valor: str, nota: str = "") -> None:

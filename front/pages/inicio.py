@@ -1,8 +1,6 @@
 """Mayordomo: pantalla inicial. Tarjetas grandes de acceso a sus vistas (Registro,
 Programación, Trabajadores) y, debajo, el mapa de la finca con lo de la semana por lote."""
 
-from base64 import b64encode
-
 import streamlit as st
 
 import mapa
@@ -23,16 +21,10 @@ TARJETAS = [
 ]
 
 
-def imagen(svg: str) -> str:
-    """El SVG como <img> (st.html no deja pasar el SVG en línea)."""
-    return f"<img alt='' src='data:image/svg+xml;base64,{b64encode(svg.encode()).decode()}'>"
-
-
 st.title(f"Hola, {st.session_state['usuario']['nombre']}")
 for col, (clave, ruta, titulo, texto, icono, simbolo) in zip(st.columns(3), TARJETAS):
-    with col.container(border=True, key=f"tarjeta_{clave}"):
-        st.html(f"<div class='ag-tarjeta'>{imagen(icono)}<div><b>{titulo}</b><small>{texto}</small></div></div>")
-        st.page_link(ruta, label=f"Abrir {titulo.lower()}", icon=simbolo, width="stretch")
+    with col:
+        ui.tarjeta(clave, ruta, titulo, texto, icono, simbolo)
 
 # ── mapa de la finca ──
 st.write("")

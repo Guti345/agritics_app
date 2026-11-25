@@ -190,6 +190,88 @@ def figura(lotes: list[dict], elegido: str | None, alto: int = 520) -> go.Figure
     return fig
 
 
+# ── mapa coloreado por un valor (p. ej. margen estimado por lote) ──────────────
+
+ESCALA = [(0.0, ARENA), (0.5, HOJA), (1.0, TINTA)]    # bajo -> alto (paleta Agritics)
+
+
+def _color_en(t: float) -> str:
+    """Color de la ESCALA en t (0-1), interpolado en RGB."""
+    for (t0, c0), (t1, c1) in zip(ESCALA, ESCALA[1:]):
+        if t <= t1:
+            f = (t - t0) / (t1 - t0) if t1 > t0 else 0
+            rgb = [round(int(c0[i:i + 2], 16) + f * (int(c1[i:i + 2], 16) - int(c0[i:i + 2], 16))) for i in (1, 3, 5)]
+            return "#" + "".join(f"{v:02X}" for v in rgb)
+    return ESCALA[-1][1]
+
+
+def figura_por_valor(lotes: list[dict], valores: dict[str, float], titulo: str, detalle: dict[str, str] | None = None,
+                     alto: int = 480) -> go.Figure:
+    """Mapa con cada lote relleno según su valor (escala #EBE2DD bajo -> #009C48 -> #004846 alto),
+    el perímetro y rótulos visibles con nombre y valor. `valores`: {lote_id: valor}; los lotes
+    sin valor (p. ej. el bosque) van en gris claro. `detalle`: texto extra para la ventanita."""
+    con_valor = [v for v in valores.values() if v is not None]
+    bajo, alto_v = (min(con_valor), max(con_valor)) if con_valor else (0, 0)
+    t_de = lambda v: 0.5 if alto_v == bajo else (v - bajo) / (alto_v - bajo)  # noqa: E731
+    fig = go.Figure()
+    for l in sorted(lotes, key=lambda l: l["id"] in valores):                  # los grises abajo
+        lon, lat = [], []
+        for poligono in piezas(l["poligono"]):
+            anillo = _coser(poligono)
+            lon += [p[0] for p in anillo] + [None]
+            lat += [p[1] for p in anillo] + [None]
+        v = valores.get(l["id"])
+        relleno = _rgba(_color_en(t_de(v)), 0.85) if v is not None else _rgba(ARENA, 0.45)
+        fig.add_trace(go.Scattermap(lon=lon[:-1], lat=lat[:-1], mode="lines", fill="toself", fillcolor=relleno,
+                                    line=dict(color=MARFIL, width=1.5), hoverinfo="skip", showlegend=False))
+    borde = perimetro()
+    if borde:
+        fig.add_trace(go.Scattermap(lon=[p[0] for p in borde], lat=[p[1] for p in borde], mode="lines",
+                                    line=dict(color=TINTA, width=4), hoverinfo="skip", showlegend=False))
+
+    # Rótulos: nombre y valor en cada lote. Texto claro sobre los rellenos oscuros y oscuro sobre
+    # los claros (Scattermap no deja un color de texto por punto: van en dos trazos).
+    puntos = {l["id"]: punto_rotulo(l["poligono"]) for l in lotes}
+    for oscuro in (False, True):
+        grupo = [l for l in lotes if (valores.get(l["id"]) is not None and t_de(valores[l["id"]]) > 0.55) == oscuro]
+        if not grupo:
+            continue
+        fig.add_trace(go.Scattermap(
+            lon=[puntos[l["id"]][0] for l in grupo], lat=[puntos[l["id"]][1] for l in grupo], mode="text",
+            text=[f"{l['nombre']}<br>{ui.pesos(valores[l['id']]) if valores.get(l['id']) is not None else '—'}"
+                  for l in grupo],
+            textfont=dict(size=12, color=MARFIL if oscuro else TINTA, family="Open Sans Bold"),
+            hovertext=[f"<b>{escape(l['nombre'])}</b><br>{titulo}: "
+                       + (ui.pesos(valores[l['id']]) if valores.get(l["id"]) is not None else "sin valor")
+                       + ((detalle or {}).get(l["id"], "")) for l in grupo],
+            hovertemplate="%{hovertext}<extra></extra>", showlegend=False))
+    if con_valor:                                                             # barra de color
+        fig.add_trace(go.Scattermap(
+            lon=[puntos[next(iter(valores))][0]] * 2, lat=[puntos[next(iter(valores))][1]] * 2, mode="markers",
+            marker=dict(size=0.1, color=[bajo, alto_v], cmin=bajo, cmax=alto_v, showscale=True,
+                        colorscale=[[t, c] for t, c in ESCALA],
+                        colorbar=dict(title=dict(text=titulo, side="top"), tickformat="$,.0f", thickness=10,
+                                      orientation="h", x=0.02, xanchor="left", y=0.98, yanchor="top", len=0.62,
+                                      bgcolor=_rgba("#FFFFFF", 0.88), outlinewidth=0, nticks=5,
+                                      tickfont=dict(size=11))),
+            hoverinfo="skip", showlegend=False))
+
+    todos = borde or [p for l in lotes for pz in piezas(l["poligono"]) for p in pz[0]]
+    centro, zoom = encuadre([p[0] for p in todos], [p[1] for p in todos], ancho=560, alto=alto)
+    fig.update_layout(
+        map=dict(style="open-street-map", center=centro, zoom=zoom),
+        height=alto, margin=dict(l=0, r=0, t=0, b=0), separators=",.", paper_bgcolor=MARFIL,
+        font=dict(family="Montserrat, Arial, sans-serif", color=TINTA),
+        hoverlabel=dict(bgcolor="#FFFFFF", font=dict(family="Montserrat, Arial, sans-serif", color=TINTA)),
+        dragmode="pan",
+    )
+    return fig
+
+
+def lotes_con_poligono() -> list[dict]:
+    return sorted((l for l in ui.leer(lambda: api.lista("/lotes")) if l.get("poligono")), key=lambda l: l["nombre"])
+
+
 # ── resumen del lote ───────────────────────────────────────────────────────────
 
 def resumen_lote(lote: dict, semana: str) -> None:

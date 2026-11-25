@@ -29,8 +29,11 @@ for texto in r2["advertencias"]:
 total = r2["total"]
 m1, m2, m3, m4 = st.columns(4)
 m1.metric("Saldo inicial", ui.pesos(r2["saldo_inicial"]), border=True)
-m2.metric("Margen del rango", ui.pesos(total["margen"]), border=True,
-          help=f"Ingresos {ui.pesos(total['ingresos']['total'])} − gastos {ui.pesos(total['gastos']['total'])}. "
+ingresos_rango = total["ingresos"]["total"]
+operativo = f"{ui.numero(100 * total['margen'] / ingresos_rango, 1)} %" if ingresos_rango else "—"   # margen / ingresos
+m2.metric(f"Margen de la finca ({operativo} operativo)", ui.pesos(total["margen"]), border=True,
+          help=f"Lo que deja la finca en el rango: ingresos − gastos ({ui.pesos(ingresos_rango)} − "
+               f"{ui.pesos(total['gastos']['total'])}). Margen operativo = margen / ingresos. "
                "El capital no entra al margen.")
 m3.metric("Capital neto (aparte)", ui.pesos(total["capital"]["neto"]), border=True,
           help=f"Aportes {ui.pesos(total['capital']['aportes'])}, retiros {ui.pesos(total['capital']['retiros'])}, "
@@ -44,10 +47,11 @@ if semanas:
     x = [f"S{int(s['periodo'][6:])}" if "-W" in s["periodo"] else s["periodo"] for s in semanas]
     rotulos = [ui.rotulo_semana(s["periodo"]) if "-W" in s["periodo"] else s["periodo"] for s in semanas]
     fig = go.Figure()
+    # Barras suavizadas (opacidad) para que resalten las líneas de margen y de capital.
     fig.add_bar(x=x, y=[s["ingresos"]["total"] for s in semanas], name="Ingresos", marker_color=g.SERIES[1],
-                customdata=rotulos, hovertemplate="Ingresos $%{y:,.0f}")
+                marker_opacity=0.35, customdata=rotulos, hovertemplate="Ingresos $%{y:,.0f}")
     fig.add_bar(x=x, y=[s["gastos"]["total"] for s in semanas], name="Gastos", marker_color=g.SERIES[2],
-                hovertemplate="Gastos $%{y:,.0f}")
+                marker_opacity=0.35, hovertemplate="Gastos $%{y:,.0f}")
     fig.add_scatter(x=x, y=[s["margen"] for s in semanas], name="Margen (ingresos − gastos)", mode="lines+markers",
                     line=dict(color=g.TINTA, width=2), marker=dict(size=8),
                     hovertemplate="Margen $%{y:,.0f}")
