@@ -15,96 +15,123 @@ MVP del Proyecto Empresarial - Maestría en Business Analytics, Universidad del 
 - **Frontend:** Streamlit (nunca habla directo con la base; solo con la API)
 - **Backend:** FastAPI, ruta base `/api/v1`, routers + DTOs Pydantic + capa de reglas de
   negocio (las reglas viven en la API, no en triggers de base)
-- **Base de datos:** MongoDB local, colecciones con validadores `$jsonSchema` e índices
-  únicos (segunda línea de defensa: toda regla falla antes, en la API, con mensaje claro en
+- **Base de datos:** MongoDB, colecciones con validadores `$jsonSchema` e índices únicos
+  (segunda línea de defensa: toda regla falla antes, en la API, con mensaje claro en
   español)
 - **Fotos** (lluvia, recibos de la Cooperativa, comprobantes): carpeta local `/fotos` del
   repo; el documento guarda la ruta
 - Sin Docker en el MVP; reproducibilidad con `requirements.txt`
 
-## Estructura del repositorio
+## Qué hay en el repositorio
 
 ```
 agritics_app/
-  Agritics_kit_visual/   # marca: logos, paleta, fuentes, íconos (assets/ para la app)
-  back/                  # FastAPI
-    main.py              #   app, ruta base /api/v1, Swagger en /docs
-    init_db.py           #   crea colecciones con validadores $jsonSchema e índices
-    datos_mongo.py       #   UNA corrida deja todo: el año simulado (enero - semana 46 de 2026) y la
-                         #   semana de la sustentación (W47 pagada, W48 por pagar y planeada, W49 programada)
-    app/                 #   database.py, schemas.py, routers/, reglas/
-  front/                 # Streamlit: app.py, pages/, assets/, .streamlit/config.toml
-  fotos/                 # imágenes subidas por la app (ruta guardada en el documento)
-  .env.example           # MONGO_URI y MONGO_DB (copiar a .env)
+  back/                     # API FastAPI (75 endpoints en 21 routers)
+    main.py                 #   app, ruta base /api/v1, Swagger en /docs
+    init_db.py              #   crea colecciones con validadores $jsonSchema e índices (idempotente)
+    datos_mongo.py          #   UNA corrida deja todo: año simulado 2026 (W02-W46) y la coyuntura
+                            #   de la sustentación (W47 pagada, W48 por pagar y planeada, W49 programada)
+    app/                    #   database.py, routers/, schemas/, reglas/
+    datos_finca.geojson     #   lotes de la finca para el mapa
+  front/                    # app Streamlit por roles: mayordomo, administrador, junta, superusuario
+    app.py                  #   entrada: sin iniciar sesión no se ve nada
+    pages/                  #   29 pantallas (registro, programación, pool, cortes, caja, reportes R1-R3...)
+    assets/                 #   marca, fuentes, íconos, fondos
+  fotos/                    # imágenes subidas por la app (ruta guardada en el documento)
+  evidencias_backend/       # capturas de las pruebas de los 75 endpoints (Swagger)
+  evidencias_frontend/      # capturas de las pantallas de cada rol
+  Agritics_Pruebas_Backend.pdf   # informe de pruebas del backend, endpoint por endpoint
+  Agritics_Manual_Usuario.pdf    # manual de usuario por rol, pantalla por pantalla
+  Agritics_ppt.pdf               # presentación del proyecto (se carga después)
+  Agritics_kit_visual/      # marca: logos, paleta, fuentes, íconos y guía de marca
+  .env.example              # MONGO_URI y MONGO_DB (copiar a .env)
   requirements.txt
 ```
 
-## Cómo correr el MVP
+## Cómo replicar el proyecto en cualquier computador (Windows / PowerShell)
 
-Desde la raíz del repo, con un `.env` creado a partir de `.env.example`:
+Prerrequisitos: Python 3.10 o superior y MongoDB Community corriendo en local
+(`mongodb://localhost:27017`). Sirve igual con MongoDB Atlas: basta cambiar `MONGO_URI`
+en el `.env`.
 
-```bash
+```powershell
+# 1. Clonar y entrar
+git clone https://github.com/Guti345/agritics_app.git
+cd agritics_app
+
+# 2. Entorno virtual e instalación
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-python back/datos_mongo.py --confirmar   # crea las colecciones y deja TODOS los datos (sin --confirmar: solo muestra el plan)
-uvicorn back.main:app --reload      # API en http://localhost:8000, Swagger en /docs
-streamlit run front/app.py          # app en http://localhost:8501
+
+# 3. Configuración: copiar el ejemplo y poner tus valores
+copy .env.example .env
+#   edita .env: MONGO_URI=mongodb://localhost:27017  y  MONGO_DB=agritics
+
+# 4. Crear la base (colecciones, validadores e índices; idempotente)
+python -m back.init_db
+
+# 5. Cargar los datos de demostración (ver la ADVERTENCIA de abajo)
+python back/datos_mongo.py            # primero en seco: muestra qué haría, no toca nada
+python back/datos_mongo.py --confirmar
+
+# 6. Levantar la API (queda en http://localhost:8000, Swagger en /docs)
+uvicorn back.main:app --reload
+
+# 7. Levantar la app, en OTRA consola PowerShell con el venv activado (queda en http://localhost:8501)
+streamlit run front/app.py
 ```
 
-## Qué se decidió (memoria del planteamiento, D1-D81)
+> **ADVERTENCIA:** `python back/datos_mongo.py --confirmar` **borra TODOS los datos de
+> TODAS las colecciones** y vuelve a crear el mundo de demostración desde cero. Úsalo solo
+> sobre una base desechable, nunca sobre datos reales.
 
-**Modelo de operación:** un registro de labor = trabajador x día x lote x labor; pago a
-jornal (día a tarifa libre, admite medios jornales) o a contrato (tarifa por meta: kilos,
-horas o labor completada); la recolección es una labor más. Al jornal se paga el día
-completo: la medición del avance evalúa, no recorta. Semana lunes-domingo: lo de
-lunes-viernes se paga el sábado; lo del fin de semana se causa y se paga la siguiente.
-Una sola caja (Portugal); ingresos operativos solo café y plátano; los aportes de capital
-alimentan el flujo de caja, nunca el margen. Lluvia: 1-2 lecturas al día, cada una con hora
-y foto del pluviómetro; los mm del día son la suma.
+### Entrar a la app
 
-**Datos (MongoDB, 15 colecciones):** catálogos (lotes, labores, trabajadores, insumos,
-unidades, usuarios) y operación (labor_diaria, pool_semana, cosecha_platano, venta_platano,
-venta_cafe, compra_insumo, gasto, movimiento_caja, lluvia). Identidad por referencia (IDs);
-valores pactados por copia congelada (tarifa y forma de pago dentro de labor_diaria). Sin
-arreglos que crecen sin límite: el historial se consulta por índice; las correcciones van a
-una colección de auditoría (nada se borra). El tipo y el rendimiento del trabajador siempre
-se calculan, nunca se guardan a mano.
+El seed crea un usuario por rol (la clave de demostración está en `back/datos_mongo.py`):
 
-**Reglas (todas fallan con mensaje claro antes de tocar la base):** cantidades positivas;
-fecha no futura ni de semana cerrada; existencia y estado de catálogos; el trabajador debe
-estar activo en el pool de la semana; stock no negativo (409); un trabajador no puede tener
-dos labores abiertas a la vez; aritmética del recibo de la Cooperativa verificada al
-capturar; tope de 500 mm/día de lluvia. Cuadres (jornales vs. nómina, kg cereza vs.
-vendido) como alertas del tablero, no bloqueos.
+| Usuario | Rol | Qué ve |
+| --- | --- | --- |
+| `mayordomo` | Mayordomo | Registro de labores y recolección, programación, trabajadores |
+| `jaime` | Administrador | Lo del mayordomo y además pagar nómina, ventas/compras/gastos, caja, catálogos, reportes R1-R3, trazabilidad y Excel |
+| `junta` | Junta familiar | Reportes R1-R3 y nómina (solo lectura) |
+| `antonio` | Superusuario | Todo lo anterior y además usuarios y auditoría |
 
-**Cierre de semana (solo administrador):** resumen previo; registros cerrados e inmutables;
-nómina a pagar generada; pool archivado; consolidado Excel listo para la junta.
+## Credenciales y datos sensibles
 
-**Roles:** mayordomo (captura en campo, pool, asignaciones; corrige mientras la semana está
-abierta), administrador (todo + ventas, compras, gastos, caja, catálogos, cierre), junta
-familiar (KPIs, reportes, descarga Excel), superusuario (usuarios y auditoría global).
-Login obligatorio; sin login no se ve nada.
+Ninguna credencial real está en el repositorio. `.env` está en `.gitignore` y solo se
+publica `.env.example` con valores de ejemplo. La clave de los usuarios de demostración la
+define `back/datos_mongo.py`; cada quien puede cambiarla en su copia antes de correr el
+seed.
 
-**Reportes:** R1 producción (café cereza por día; series mojado/pasilla/pergamino con doble
-eje contra el factor de rendimiento; kg/ha; mapa de lotes; vista plátano aparte), R2 flujo
-de caja (ingresos vs. gastos por semana + margen; detalle en formato largo filtrable por
-día/semana/mes), R3 nómina lista para pagar + calendario de labores. KPIs: margen semanal,
-producción por lote, ROI simple (margen acumulado / gasto acumulado) y adopción digital (%
-de registros capturados el mismo día). Alertas: cuadres e insumo bajo de stock.
+## Evidencias y documentos
 
-**Frontend:** Streamlit con la marca Agritics (paleta verde oscuro #004846 / marfil #FFF4E8,
-Montserrat); pantallas por rol; formularios cortos; foto obligatoria donde aplica; errores
-409/422 mostrados en español sin perder lo digitado; semana en curso siempre visible.
+- `Agritics_Pruebas_Backend.pdf`: informe de las pruebas de los 75 endpoints (qué se
+  probó, respuesta y captura de cada uno). Las capturas están en `evidencias_backend/`.
+- `Agritics_Manual_Usuario.pdf`: manual de usuario organizado por rol, con cada pantalla
+  explicada. Las capturas están en `evidencias_frontend/`.
+- `Agritics_ppt.pdf`: presentación del proyecto en PDF (se carga después).
 
-**Fuera del MVP:** ROI formal, offline, optimización móvil, deployment, app nativa,
-multi-finca, integraciones en vivo, histórico del Excel, mejoras de decisión (PE II).
+## Hacia dónde apunta
 
-## Uso de herramientas de IA en este proyecto
+Agritics nace de la operación real de una finca cafetera familiar: el MVP demuestra que lo
+que hoy se lleva en papel se puede digitalizar sin cambiar la forma de trabajar de quienes
+están en el campo. Más allá del curso, el camino es crecer hacia modelos sostenibles de
+agricultura regenerativa, con sensores IoT, diversidad de cultivos y una plataforma a la
+mano del pequeño y mediano agricultor: varias fincas sobre la misma base, registro móvil
+que funcione sin conexión y analítica sobre los datos acumulados para decidir mejor cada
+semana.
 
-| Herramienta | Para qué sirvió |
-|---|---|
-| Asistente conversacional (Instinct) | Análisis de los registros en papel, organización de las decisiones del planteamiento y borradores de los entregables |
-| Claude Code | Apoyo en la escritura del código del backend y el frontend a partir de especificaciones |
-| Swagger / documentación automática | Evidencias de las reglas y los endpoints |
-| LaTeX | Documento final y presentación |
+## Matriz de uso de IA
 
-Las decisiones de negocio y la redacción final son del autor.
+| Etapa | Herramienta | Uso |
+| --- | --- | --- |
+| Alcance y diseño | Claude | Apoyo para aterrizar reglas de negocio y el modelo de datos. |
+| Kit de marca | Claude | Generación del kit visual (logos, paleta, íconos) a partir de la identidad definida. |
+| Backend | Claude Code | Escritura y corrección de código con revisión y decisiones del equipo. |
+| Frontend | Claude Code | Construcción de pantallas y estilos, verificadas en la app corriendo. |
+| Datos y evidencias | Claude Code | Seed determinista y captura automática de las pruebas. |
+| Documentos | Claude | Borradores del informe de pruebas y del manual, editados y aprobados por el equipo. |
+
+Todas las decisiones de diseño, la verificación del código y la aprobación final de cada
+entregable fueron del equipo.
