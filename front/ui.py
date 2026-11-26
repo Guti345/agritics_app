@@ -93,6 +93,12 @@ table.ag-cal th.fuera, table.ag-cal td.fuera {opacity: .45;}   /* día de la sem
 /* cajitas (st.metric): la etiqueta pasa a dos renglones en vez de cortarse con «…» */
 [data-testid="stMetricLabel"], [data-testid="stMetricLabel"] * {white-space: normal !important;
   overflow: visible !important; text-overflow: clip !important; height: auto !important;}
+/* el valor tampoco se corta: su letra se ajusta al ancho de la cajita (container query, tope en
+   el tamaño normal de Streamlit) y, si aun así no cupiera, pasa a otro renglón en vez de «…» */
+[data-testid="stMetric"] {container-type: inline-size;}
+[data-testid="stMetricValue"] {font-size: clamp(1.25rem, 10.5cqi, 2.25rem) !important;}
+[data-testid="stMetricValue"] * {white-space: normal !important; overflow: visible !important;
+  text-overflow: clip !important; font-size: inherit !important;}
 .ag-capital p {display: flex; justify-content: space-between; margin: .1rem 0; font-size: 13px;}
 .ag-capital div {font-size: 26px !important;}
 /* barra lateral: el pie («Una herramienta de» + Soagro) queda pegado al fondo. La columna de
