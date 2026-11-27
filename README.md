@@ -127,7 +127,7 @@ semana.
 | Etapa | Herramienta | Uso |
 | --- | --- | --- |
 | Alcance y diseño | Claude | Apoyo para aterrizar reglas de negocio y el modelo de datos. |
-| Kit de marca | Claude | Generación del kit visual (logos, paleta, íconos) a partir de la identidad definida. |
+| Kit de marca | ChatGPT | Generación del kit visual (logos, paleta, íconos) a partir de la identidad definida. |
 | Backend | Claude Code | Escritura y corrección de código con revisión y decisiones del equipo. |
 | Frontend | Claude Code | Construcción de pantallas y estilos, verificadas en la app corriendo. |
 | Datos y evidencias | Claude Code | Seed determinista y captura automática de las pruebas. |
